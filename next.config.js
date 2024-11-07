@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  distDir: '.next',
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
-  // Remove output: 'export' if it's there
+  basePath: '',
 }
 
 module.exports = nextConfig
