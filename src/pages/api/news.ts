@@ -8,25 +8,56 @@ const openai = new OpenAI({
     apiKey: OPENAI_API_KEY
 });
 
+// More focused workforce solutions keywords
+const keywords = [
+    // Staffing Industry Terms
+    '"workforce solutions"',
+    '"staffing industry"',
+    '"recruitment sector"',
+    '"talent acquisition"',
+    '"contingent workforce"',
+    
+    // Workforce Trends
+    '"skills shortage"',
+    '"labor market"',
+    '"workforce trends"',
+    '"talent pipeline"',
+    '"workforce management"',
+    
+    // Business Impact
+    '"hiring trends"',
+    '"workforce planning"',
+    '"talent strategy"',
+    '"labor costs"',
+    '"staff turnover"'
+].join(' OR ');
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
-        // Fetch news
         const response = await fetch(
             `https://newsapi.org/v2/everything?` +
-            `q=workforce OR recruitment OR "talent acquisition"&` +
+            `q=${encodeURIComponent(keywords)}&` +
             `language=en&` +
             `sortBy=relevancy&` +
             `pageSize=12&` +
+            `excludeDomains=youtube.com,facebook.com&` +
             `apiKey=${NEWS_API_KEY}`
         )
 
         const data = await response.json()
 
-        // Process each article
+        // Filter out job postings and irrelevant content
+        const filteredArticles = data.articles.filter((article: any) => {
+            const text = `${article.title} ${article.description}`.toLowerCase();
+            return !text.includes('job posting') && 
+                   !text.includes('position available') &&
+                   !text.includes('apply now') &&
+                   !text.includes('sponsored content');
+        });
+
         const processedArticles = await Promise.all(
-            data.articles.map(async (article: any) => {
+            filteredArticles.map(async (article: any) => {
                 try {
-                    // Basic article structure
                     const processedArticle = {
                         title: article.title || 'No title',
                         description: article.description || 'No description',
@@ -46,7 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         }
                     }
 
-                    // Try to get AI analysis
                     try {
                         const analysis = await analyzeArticle(article)
                         if (analysis) {
@@ -61,7 +91,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         }
                     } catch (aiError) {
                         console.error('AI analysis error:', aiError)
-                        // Continue with default analysis if AI fails
                     }
 
                     return processedArticle
@@ -73,8 +102,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })
         )
 
-        // Filter out any failed articles
-        const validArticles = processedArticles.filter(article => article !== null)
+        // Filter out failed articles and sort by relevance
+        const validArticles = processedArticles
+            .filter(article => article !== null)
+            .sort((a: any, b: any) => 
+                (b?.analysis?.relevanceScore || 0) - (a?.analysis?.relevanceScore || 0)
+            );
 
         res.status(200).json(validArticles)
 
@@ -86,31 +119,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function analyzeArticle(article: any) {
     const prompt = `
-Analyze this workforce-related news article:
+Analyze this workforce solutions industry news article from a staffing industry perspective:
 
 Title: ${article.title}
 Description: ${article.description}
 Source: ${article.source?.name}
 
-Provide a JSON response with:
+Provide a detailed analysis in JSON format focusing on staffing industry implications. Response format:
 {
-    "impact": "High/Medium/Low",
-    "sector": "Technology/Healthcare/Finance/Professional Services/Manufacturing/General",
-    "keyInsights": ["insight1", "insight2"],
+    "impact": "High/Medium/Low", // Based on significance to staffing/recruitment industry
+    "sector": "string", // Choose the most relevant: "IT/Tech", "Healthcare", "Professional Services", "Manufacturing", "Finance", "Engineering", "Cross-Industry"
+    "keyInsights": [ // 2-3 key takeaways specifically for staffing industry professionals
+        "string",
+        "string"
+    ],
     "implications": {
-        "shortTerm": "short term impact",
-        "longTerm": "long term impact"
+        "shortTerm": "string", // Immediate impact on staffing/recruitment businesses
+        "longTerm": "string"  // Long-term industry implications
     },
-    "relevanceScore": 1-10,
-    "workforceTrends": ["trend1", "trend2"]
+    "relevanceScore": number, // Rate 1-10 for relevance to staffing industry (10 being highest)
+    "workforceTrends": [ // 2-3 specific workforce trends identified
+        "string",
+        "string"
+    ]
 }
+
+Focus on:
+- Direct implications for staffing/recruitment businesses
+- Client industry impacts
+- Changes in workforce demands
+- Market opportunities for staffing providers
+- Skills and talent implications
 `
 
     const completion = await openai.chat.completions.create({
         messages: [
             {
                 role: "system",
-                content: "You are an expert analyst specializing in workforce solutions and recruitment industry trends."
+                content: "You are a senior analyst specializing in the workforce solutions and staffing industry. Provide practical, business-focused analysis for staffing industry professionals."
             },
             { role: "user", content: prompt }
         ],
@@ -119,7 +165,22 @@ Provide a JSON response with:
     })
 
     try {
-        return JSON.parse(completion.choices[0].message.content || '{}')
+        const analysis = JSON.parse(completion.choices[0].message.content || '{}')
+        
+        // Validate and clean analysis
+        return {
+            impact: ['High', 'Medium', 'Low'].includes(analysis.impact) ? analysis.impact : 'Medium',
+            sector: analysis.sector || 'Cross-Industry',
+            keyInsights: Array.isArray(analysis.keyInsights) ? analysis.keyInsights.slice(0, 3) : ['Analysis unavailable'],
+            implications: {
+                shortTerm: analysis.implications?.shortTerm || 'Analysis unavailable',
+                longTerm: analysis.implications?.longTerm || 'Analysis unavailable'
+            },
+            relevanceScore: Number.isInteger(analysis.relevanceScore) ? 
+                Math.min(Math.max(analysis.relevanceScore, 1), 10) : 5,
+            workforceTrends: Array.isArray(analysis.workforceTrends) ? 
+                analysis.workforceTrends.slice(0, 3) : []
+        }
     } catch (error) {
         console.error('AI response parsing error:', error)
         return null
