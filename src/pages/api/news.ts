@@ -1,188 +1,133 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import OpenAI from 'openai'
+import React, { useEffect, useState } from 'react'
 
-const NEWS_API_KEY = process.env.NEWS_API_KEY
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+// ... (keep existing NewsItem type)
 
-const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY
-});
+const CATEGORIES = [
+  { id: 'ai', name: 'AI & Automation' },
+  { id: 'labor', name: 'Labour Market' },
+  { id: 'msp', name: 'MSP/RPO' },
+  { id: 'stem', name: 'STEM' },
+  { id: 'chomsky', name: 'Critical Analysis' },
+  { id: 'all', name: 'All Categories' }
+]
 
-// More focused workforce solutions keywords
-const keywords = [
-    // Staffing Industry Terms
-    '"workforce solutions"',
-    '"staffing industry"',
-    '"recruitment sector"',
-    '"talent acquisition"',
-    '"contingent workforce"',
-    
-    // Workforce Trends
-    '"skills shortage"',
-    '"labor market"',
-    '"workforce trends"',
-    '"talent pipeline"',
-    '"workforce management"',
-    
-    // Business Impact
-    '"hiring trends"',
-    '"workforce planning"',
-    '"talent strategy"',
-    '"labor costs"',
-    '"staff turnover"'
-].join(' OR ');
+const REGIONS = [
+  { id: 'uk', name: 'United Kingdom' },
+  { id: 'usa', name: 'United States' },
+  { id: 'eu', name: 'Europe' },
+  { id: 'global', name: 'Global' }
+]
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default function Home() {
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [expandedCard, setExpandedCard] = useState<number | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedRegion, setSelectedRegion] = useState('global')
+
+  useEffect(() => {
+    fetchNews()
+  }, [selectedCategory, selectedRegion])
+
+  const fetchNews = async () => {
     try {
-        const response = await fetch(
-            `https://newsapi.org/v2/everything?` +
-            `q=${encodeURIComponent(keywords)}&` +
-            `language=en&` +
-            `sortBy=relevancy&` +
-            `pageSize=12&` +
-            `excludeDomains=youtube.com,facebook.com&` +
-            `apiKey=${NEWS_API_KEY}`
-        )
-
-        const data = await response.json()
-
-        // Filter out job postings and irrelevant content
-        const filteredArticles = data.articles.filter((article: any) => {
-            const text = `${article.title} ${article.description}`.toLowerCase();
-            return !text.includes('job posting') && 
-                   !text.includes('position available') &&
-                   !text.includes('apply now') &&
-                   !text.includes('sponsored content');
-        });
-
-        const processedArticles = await Promise.all(
-            filteredArticles.map(async (article: any) => {
-                try {
-                    const processedArticle = {
-                        title: article.title || 'No title',
-                        description: article.description || 'No description',
-                        url: article.url || '#',
-                        source: article.source?.name || 'Unknown source',
-                        publishedAt: article.publishedAt || new Date().toISOString(),
-                        impact: 'Medium',
-                        sector: 'General',
-                        analysis: {
-                            keyInsights: ['Analysis pending'],
-                            implications: {
-                                shortTerm: 'Analysis pending',
-                                longTerm: 'Analysis pending'
-                            },
-                            relevanceScore: 5,
-                            workforceTrends: []
-                        }
-                    }
-
-                    try {
-                        const analysis = await analyzeArticle(article)
-                        if (analysis) {
-                            processedArticle.impact = analysis.impact
-                            processedArticle.sector = analysis.sector
-                            processedArticle.analysis = {
-                                keyInsights: analysis.keyInsights,
-                                implications: analysis.implications,
-                                relevanceScore: analysis.relevanceScore,
-                                workforceTrends: analysis.workforceTrends
-                            }
-                        }
-                    } catch (aiError) {
-                        console.error('AI analysis error:', aiError)
-                    }
-
-                    return processedArticle
-
-                } catch (articleError) {
-                    console.error('Article processing error:', articleError)
-                    return null
-                }
-            })
-        )
-
-        // Filter out failed articles and sort by relevance
-        const validArticles = processedArticles
-            .filter(article => article !== null)
-            .sort((a: any, b: any) => 
-                (b?.analysis?.relevanceScore || 0) - (a?.analysis?.relevanceScore || 0)
-            );
-
-        res.status(200).json(validArticles)
-
-    } catch (error) {
-        console.error('API Error:', error)
-        res.status(500).json({ error: 'Failed to fetch news' })
+      setLoading(true)
+      const response = await fetch(`/api/news?category=${selectedCategory}&region=${selectedRegion}`)
+      const data = await response.json()
+      setNews(data)
+    } catch (err) {
+      setError('Failed to fetch news')
+      console.error('Error fetching news:', err)
+    } finally {
+      setLoading(false)
     }
-}
+  }
 
-async function analyzeArticle(article: any) {
-    const prompt = `
-Analyze this workforce solutions industry news article from a staffing industry perspective:
+  // ... (keep existing toggleCard function)
 
-Title: ${article.title}
-Description: ${article.description}
-Source: ${article.source?.name}
+  const FilterButton = ({ 
+    active, 
+    onClick, 
+    children 
+  }: { 
+    active: boolean; 
+    onClick: () => void; 
+    children: React.ReactNode 
+  }) => (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 
+        ${active 
+          ? 'bg-gray-900 text-white' 
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+    >
+      {children}
+    </button>
+  )
 
-Provide a detailed analysis in JSON format focusing on staffing industry implications. Response format:
-{
-    "impact": "High/Medium/Low", // Based on significance to staffing/recruitment industry
-    "sector": "string", // Choose the most relevant: "IT/Tech", "Healthcare", "Professional Services", "Manufacturing", "Finance", "Engineering", "Cross-Industry"
-    "keyInsights": [ // 2-3 key takeaways specifically for staffing industry professionals
-        "string",
-        "string"
-    ],
-    "implications": {
-        "shortTerm": "string", // Immediate impact on staffing/recruitment businesses
-        "longTerm": "string"  // Long-term industry implications
-    },
-    "relevanceScore": number, // Rate 1-10 for relevance to staffing industry (10 being highest)
-    "workforceTrends": [ // 2-3 specific workforce trends identified
-        "string",
-        "string"
-    ]
-}
+  return (
+    <div className="min-h-screen bg-white p-8">
+      <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
+        <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
+          Blurred Citadel
+        </span>
+      </h1>
 
-Focus on:
-- Direct implications for staffing/recruitment businesses
-- Client industry impacts
-- Changes in workforce demands
-- Market opportunities for staffing providers
-- Skills and talent implications
-`
+      {/* Filters Section */}
+      <div className="mb-8 space-y-4">
+        {/* Categories */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-600 mb-2">Category Focus</h2>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map(category => (
+              <FilterButton
+                key={category.id}
+                active={selectedCategory === category.id}
+                onClick={() => setSelectedCategory(category.id)}
+              >
+                {category.name}
+              </FilterButton>
+            ))}
+          </div>
+        </div>
 
-    const completion = await openai.chat.completions.create({
-        messages: [
-            {
-                role: "system",
-                content: "You are a senior analyst specializing in the workforce solutions and staffing industry. Provide practical, business-focused analysis for staffing industry professionals."
-            },
-            { role: "user", content: prompt }
-        ],
-        model: "gpt-3.5-turbo",
-        temperature: 0.3,
-    })
+        {/* Regions */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-600 mb-2">Geographic Region</h2>
+          <div className="flex flex-wrap gap-2">
+            {REGIONS.map(region => (
+              <FilterButton
+                key={region.id}
+                active={selectedRegion === region.id}
+                onClick={() => setSelectedRegion(region.id)}
+              >
+                {region.name}
+              </FilterButton>
+            ))}
+          </div>
+        </div>
 
-    try {
-        const analysis = JSON.parse(completion.choices[0].message.content || '{}')
-        
-        // Validate and clean analysis
-        return {
-            impact: ['High', 'Medium', 'Low'].includes(analysis.impact) ? analysis.impact : 'Medium',
-            sector: analysis.sector || 'Cross-Industry',
-            keyInsights: Array.isArray(analysis.keyInsights) ? analysis.keyInsights.slice(0, 3) : ['Analysis unavailable'],
-            implications: {
-                shortTerm: analysis.implications?.shortTerm || 'Analysis unavailable',
-                longTerm: analysis.implications?.longTerm || 'Analysis unavailable'
-            },
-            relevanceScore: Number.isInteger(analysis.relevanceScore) ? 
-                Math.min(Math.max(analysis.relevanceScore, 1), 10) : 5,
-            workforceTrends: Array.isArray(analysis.workforceTrends) ? 
-                analysis.workforceTrends.slice(0, 3) : []
-        }
-    } catch (error) {
-        console.error('AI response parsing error:', error)
-        return null
-    }
+        {/* Active Filters Display */}
+        <div className="pt-2">
+          <div className="text-sm text-gray-500">
+            Showing: {' '}
+            <span className="font-medium text-gray-900">
+              {CATEGORIES.find(c => c.id === selectedCategory)?.name} • {REGIONS.find(r => r.id === selectedRegion)?.name}
+            </span>
+            {selectedCategory !== 'all' && (
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Rest of your existing JSX... */}
+    </div>
+  )
 }
