@@ -10,9 +10,7 @@
   "dependencies": {
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "clsx": "^2.0.0",
-    "tailwind-merge": "^2.0.0"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
