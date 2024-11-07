@@ -8,7 +8,7 @@ type NewsItem = {
   publishedAt: string
   impact: string
   sector: string
-  analysis: {
+  analysis?: {
     keyInsights: string[]
     implications: {
       shortTerm: string
@@ -25,28 +25,32 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchNews()
-  }, [])
-
-  const fetchNews = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/news')
-      const data = await response.json()
-      setNews(data)
-    } catch (err) {
-      setError('Failed to fetch news')
-      console.error('Error fetching news:', err)
-    } finally {
-      setLoading(false)
+    async function loadNews() {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/news')
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const data = await response.json()
+        console.log('Received data:', data) // Debug log
+        setNews(data)
+      } catch (err) {
+        console.error('Fetch error:', err) // Debug log
+        setError(err instanceof Error ? err.message : 'An error occurred while fetching news')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+
+    loadNews()
+  }, [])
 
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-4">
         <h1 className="text-2xl font-bold mb-6">Blurred Citadel</h1>
-        <div className="text-center py-10">Analyzing news data...</div>
+        <div className="text-center py-10">Loading news data...</div>
       </div>
     )
   }
@@ -55,7 +59,9 @@ export default function Home() {
     return (
       <div className="max-w-4xl mx-auto p-4">
         <h1 className="text-2xl font-bold mb-6">Blurred Citadel</h1>
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+          Error loading news: {error}
+        </div>
       </div>
     )
   }
@@ -76,51 +82,53 @@ export default function Home() {
             
             <div className="mb-4 text-sm text-gray-600">
               Source: {item.source} | Published: {new Date(item.publishedAt).toLocaleDateString()}
-              <span className={`ml-2 px-2 py-1 rounded ${
-                item.impact === 'High' ? 'bg-red-100 text-red-800' :
-                item.impact === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-blue-100 text-blue-800'
-              }`}>
-                Impact: {item.impact}
-              </span>
-              <span className="ml-2 px-2 py-1 rounded bg-gray-100">
-                Relevance: {item.analysis.relevanceScore}/10
-              </span>
             </div>
 
-            <div className="mb-4">
-              <h3 className="font-medium mb-2">Key Insights:</h3>
-              <ul className="list-disc pl-4 space-y-1">
-                {item.analysis.keyInsights.map((insight, i) => (
-                  <li key={i} className="text-gray-600">{insight}</li>
-                ))}
-              </ul>
-            </div>
+            <p className="mb-4 text-gray-600">{item.description}</p>
 
-            <div className="mb-4">
-              <h3 className="font-medium mb-2">Implications:</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Short Term</h4>
-                  <p className="text-gray-600">{item.analysis.implications.shortTerm}</p>
+            {item.analysis ? (
+              <>
+                <div className="mb-4">
+                  <h3 className="font-medium mb-2">Key Insights:</h3>
+                  <ul className="list-disc pl-4 space-y-1">
+                    {item.analysis.keyInsights.map((insight, i) => (
+                      <li key={i} className="text-gray-600">{insight}</li>
+                    ))}
+                  </ul>
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Long Term</h4>
-                  <p className="text-gray-600">{item.analysis.implications.longTerm}</p>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <h3 className="font-medium mb-2">Workforce Trends:</h3>
-              <div className="flex flex-wrap gap-2">
-                {item.analysis.workforceTrends.map((trend, i) => (
-                  <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
-                    {trend}
-                  </span>
-                ))}
+                <div className="mb-4">
+                  <h3 className="font-medium mb-2">Implications:</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">Short Term</h4>
+                      <p className="text-gray-600">{item.analysis.implications.shortTerm}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500">Long Term</h4>
+                      <p className="text-gray-600">{item.analysis.implications.longTerm}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {item.analysis.workforceTrends.length > 0 && (
+                  <div>
+                    <h3 className="font-medium mb-2">Workforce Trends:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {item.analysis.workforceTrends.map((trend, i) => (
+                        <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
+                          {trend}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-yellow-600 bg-yellow-50 p-4 rounded">
+                Analysis in progress...
               </div>
-            </div>
+            )}
           </div>
         ))}
       </div>
