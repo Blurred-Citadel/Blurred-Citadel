@@ -49,8 +49,12 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <h1 className="text-3xl font-bold text-blue-600 mb-6">Blurred Citadel</h1>
+      <div className="min-h-screen bg-white p-8">
+        <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
+          <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
+            Blurred Citadel
+          </span>
+        </h1>
         <div className="text-gray-600">Loading...</div>
       </div>
     )
@@ -58,23 +62,31 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <h1 className="text-3xl font-bold text-blue-600 mb-6">Blurred Citadel</h1>
+      <div className="min-h-screen bg-white p-8">
+        <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
+          <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
+            Blurred Citadel
+          </span>
+        </h1>
         <div className="bg-red-50 text-red-600 p-4 rounded">{error}</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-3xl font-bold text-blue-600 mb-6">Blurred Citadel</h1>
+    <div className="min-h-screen bg-white p-8">
+      <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
+        <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
+          Blurred Citadel
+        </span>
+      </h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {news.map((item, index) => (
           <div key={index}>
             {/* Regular Card */}
             <div 
-              className="bg-white shadow rounded-lg transition-all duration-300 h-[400px] cursor-pointer hover:shadow-lg"
+              className="bg-gray-50 shadow rounded-lg transition-all duration-300 h-[400px] cursor-pointer hover:shadow-lg border border-gray-200"
               onClick={() => toggleCard(index)}
             >
               <div className="p-4 h-full flex flex-col">
@@ -92,7 +104,7 @@ export default function Home() {
                     >
                       {item.impact}
                     </span>
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
                       {item.sector}
                     </span>
                   </div>
@@ -123,8 +135,8 @@ export default function Home() {
                   onClick={() => toggleCard(index)}
                 />
                 <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                             bg-white rounded-lg shadow-xl z-50 w-[90%] max-w-6xl max-h-[80vh] 
-                             overflow-y-auto">
+                             bg-gray-50 rounded-lg shadow-xl z-50 w-[90%] max-w-6xl max-h-[80vh] 
+                             overflow-y-auto border border-gray-200">
                   <div className="p-6">
                     {/* Close Button */}
                     <button 
@@ -149,7 +161,7 @@ export default function Home() {
                           >
                             {item.impact}
                           </span>
-                          <span className="px-2 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                          <span className="px-2 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
                             {item.sector}
                           </span>
                         </div>
@@ -178,11 +190,11 @@ export default function Home() {
                             <div>
                               <h3 className="text-lg font-semibold text-gray-900 mb-3">Implications</h3>
                               <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-gray-50 p-4 rounded">
+                                <div className="bg-white p-4 rounded shadow-sm">
                                   <h4 className="font-medium text-gray-900 mb-2">Short Term</h4>
                                   <p className="text-gray-600">{item.analysis.implications.shortTerm}</p>
                                 </div>
-                                <div className="bg-gray-50 p-4 rounded">
+                                <div className="bg-white p-4 rounded shadow-sm">
                                   <h4 className="font-medium text-gray-900 mb-2">Long Term</h4>
                                   <p className="text-gray-600">{item.analysis.implications.longTerm}</p>
                                 </div>
