@@ -1,133 +1,131 @@
-import React, { useEffect, useState } from 'react'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import OpenAI from 'openai'
 
-// ... (keep existing NewsItem type)
+const NEWS_API_KEY = process.env.NEWS_API_KEY
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
-const CATEGORIES = [
-  { id: 'ai', name: 'AI & Automation' },
-  { id: 'labor', name: 'Labour Market' },
-  { id: 'msp', name: 'MSP/RPO' },
-  { id: 'stem', name: 'STEM' },
-  { id: 'chomsky', name: 'Critical Analysis' },
-  { id: 'all', name: 'All Categories' }
-]
+const openai = new OpenAI({
+    apiKey: OPENAI_API_KEY
+});
 
-const REGIONS = [
-  { id: 'uk', name: 'United Kingdom' },
-  { id: 'usa', name: 'United States' },
-  { id: 'eu', name: 'Europe' },
-  { id: 'global', name: 'Global' }
-]
+// Category-specific keywords
+const CATEGORY_KEYWORDS = {
+    ai: 'artificial intelligence OR machine learning OR automation OR AI recruitment OR AI staffing',
+    labor: 'labor market OR employment trends OR workforce dynamics OR job market',
+    msp: 'managed service provider OR RPO OR recruitment process outsourcing OR workforce solutions',
+    stem: 'engineering jobs OR technology recruitment OR science recruitment OR STEM careers',
+    chomsky: 'workforce inequality OR labor rights OR corporate influence OR worker exploitation',
+    all: 'workforce OR recruitment OR staffing OR employment'
+};
 
-export default function Home() {
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [expandedCard, setExpandedCard] = useState<number | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedRegion, setSelectedRegion] = useState('global')
+// Region-specific parameters
+const REGION_PARAMS = {
+    uk: 'country=gb',
+    usa: 'country=us',
+    eu: 'domains=ft.com,reuters.com,bloomberg.com,euronews.com',
+    global: ''
+};
 
-  useEffect(() => {
-    fetchNews()
-  }, [selectedCategory, selectedRegion])
-
-  const fetchNews = async () => {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
-      setLoading(true)
-      const response = await fetch(`/api/news?category=${selectedCategory}&region=${selectedRegion}`)
-      const data = await response.json()
-      setNews(data)
-    } catch (err) {
-      setError('Failed to fetch news')
-      console.error('Error fetching news:', err)
-    } finally {
-      setLoading(false)
+        const { category = 'all', region = 'global' } = req.query;
+        
+        // Get keywords for selected category
+        const keywords = CATEGORY_KEYWORDS[category as keyof typeof CATEGORY_KEYWORDS] || CATEGORY_KEYWORDS.all;
+        
+        // Get region parameter
+        const regionParam = REGION_PARAMS[region as keyof typeof REGION_PARAMS] || '';
+
+        // Construct API URL
+        const apiUrl = `https://newsapi.org/v2/everything?` +
+            `q=${encodeURIComponent(keywords)}&` +
+            `language=en&` +
+            `sortBy=relevancy&` +
+            `pageSize=12&` +
+            (regionParam ? `&${regionParam}` : '') +
+            `&apiKey=${NEWS_API_KEY}`;
+
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (!data.articles || !Array.isArray(data.articles)) {
+            throw new Error('Invalid response from NewsAPI');
+        }
+
+        // Process the articles
+        const processedArticles = await Promise.all(
+            data.articles.map(async (article: any) => {
+                try {
+                    const analysis = await analyzeArticle(article);
+                    return {
+                        title: article.title || 'No title',
+                        description: article.description || 'No description',
+                        url: article.url || '#',
+                        source: article.source?.name || 'Unknown source',
+                        publishedAt: article.publishedAt || new Date().toISOString(),
+                        impact: analysis?.impact || 'Medium',
+                        sector: analysis?.sector || 'General',
+                        analysis: analysis ? {
+                            keyInsights: analysis.keyInsights,
+                            implications: analysis.implications,
+                            relevanceScore: analysis.relevanceScore,
+                            workforceTrends: analysis.workforceTrends
+                        } : undefined
+                    };
+                } catch (error) {
+                    console.error('Error processing article:', error);
+                    return null;
+                }
+            })
+        );
+
+        const validArticles = processedArticles.filter(article => article !== null);
+        res.status(200).json(validArticles);
+
+    } catch (error) {
+        console.error('API Error:', error);
+        res.status(500).json({ error: 'Failed to fetch news' });
     }
-  }
+}
 
-  // ... (keep existing toggleCard function)
+async function analyzeArticle(article: any) {
+    const prompt = `
+Analyze this workforce-related news article:
 
-  const FilterButton = ({ 
-    active, 
-    onClick, 
-    children 
-  }: { 
-    active: boolean; 
-    onClick: () => void; 
-    children: React.ReactNode 
-  }) => (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 
-        ${active 
-          ? 'bg-gray-900 text-white' 
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-    >
-      {children}
-    </button>
-  )
+Title: ${article.title}
+Description: ${article.description}
+Source: ${article.source?.name}
 
-  return (
-    <div className="min-h-screen bg-white p-8">
-      <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
-        <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
-          Blurred Citadel
-        </span>
-      </h1>
+Provide a JSON response with:
+{
+    "impact": "High/Medium/Low",
+    "sector": "Technology/Healthcare/Finance/Professional Services/Manufacturing/General",
+    "keyInsights": ["insight1", "insight2"],
+    "implications": {
+        "shortTerm": "short term impact",
+        "longTerm": "long term impact"
+    },
+    "relevanceScore": 1-10,
+    "workforceTrends": ["trend1", "trend2"]
+}
+`
 
-      {/* Filters Section */}
-      <div className="mb-8 space-y-4">
-        {/* Categories */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">Category Focus</h2>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(category => (
-              <FilterButton
-                key={category.id}
-                active={selectedCategory === category.id}
-                onClick={() => setSelectedCategory(category.id)}
-              >
-                {category.name}
-              </FilterButton>
-            ))}
-          </div>
-        </div>
+    const completion = await openai.chat.completions.create({
+        messages: [
+            {
+                role: "system",
+                content: "You are an expert analyst specializing in workforce solutions and recruitment industry trends."
+            },
+            { role: "user", content: prompt }
+        ],
+        model: "gpt-3.5-turbo",
+        temperature: 0.3,
+    });
 
-        {/* Regions */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">Geographic Region</h2>
-          <div className="flex flex-wrap gap-2">
-            {REGIONS.map(region => (
-              <FilterButton
-                key={region.id}
-                active={selectedRegion === region.id}
-                onClick={() => setSelectedRegion(region.id)}
-              >
-                {region.name}
-              </FilterButton>
-            ))}
-          </div>
-        </div>
-
-        {/* Active Filters Display */}
-        <div className="pt-2">
-          <div className="text-sm text-gray-500">
-            Showing: {' '}
-            <span className="font-medium text-gray-900">
-              {CATEGORIES.find(c => c.id === selectedCategory)?.name} • {REGIONS.find(r => r.id === selectedRegion)?.name}
-            </span>
-            {selectedCategory !== 'all' && (
-              <button
-                onClick={() => setSelectedCategory('all')}
-                className="ml-2 text-gray-400 hover:text-gray-600"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Rest of your existing JSX... */}
-    </div>
-  )
+    try {
+        return JSON.parse(completion.choices[0].message.content || '{}');
+    } catch (error) {
+        console.error('AI response parsing error:', error);
+        return null;
+    }
 }
