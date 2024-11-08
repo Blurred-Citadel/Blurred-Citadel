@@ -1,5 +1,12 @@
-import { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import OpenAI from 'openai'
+
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+const openai = new OpenAI({
+    apiKey: OPENAI_API_KEY
+});
 
 // ... (previous code remains the same until the handler function)
 
