@@ -2,21 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 
-// Extended timeout for the API
-export const config = {
-    api: {
-        responseLimit: false,
-        bodyParser: {
-            sizeLimit: '10mb',
-        },
-    },
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
         const { category = 'all', region = 'global' } = req.query;
         
-        // More targeted keywords for each category
+        // More focused keywords for each category
         const categoryKeywords = {
             ai: 'artificial intelligence recruitment OR ai hiring trends OR automation workforce',
             labor: '"labor market" OR "employment trends" OR "workforce statistics"',
@@ -26,36 +16,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             all: 'workforce solutions OR recruitment trends OR employment',
         };
 
-        // Get keywords for selected category
         const keywords = categoryKeywords[category as keyof typeof categoryKeywords] || categoryKeywords.all;
 
-        // Base query parameters
-        const queryParams = new URLSearchParams({
-            apiKey: NEWS_API_KEY,
-            language: 'en',
-            sortBy: 'relevancy',
-            pageSize: '20', // Fetch more to filter for relevance
-        });
-
-        // Region-specific handling
-        let baseUrl = 'https://newsapi.org/v2/everything';
+        // Construct the base URL
+        let apiUrl = 'https://newsapi.org/v2/everything?';
+        
+        // Add standard parameters
+        apiUrl += `q=${encodeURIComponent(keywords)}`;
+        apiUrl += `&language=en`;
+        apiUrl += `&sortBy=relevancy`;
+        apiUrl += `&pageSize=20`;
+        
+        // Add region-specific parameters
         if (region !== 'global') {
             switch(region) {
                 case 'uk':
-                    queryParams.append('domains', 'bbc.co.uk,theguardian.com,telegraph.co.uk,ft.com');
+                    apiUrl += `&domains=bbc.co.uk,theguardian.com,telegraph.co.uk,ft.com`;
                     break;
                 case 'usa':
-                    queryParams.append('domains', 'wsj.com,nytimes.com,bloomberg.com,reuters.com');
+                    apiUrl += `&domains=wsj.com,nytimes.com,bloomberg.com,reuters.com`;
                     break;
                 case 'eu':
-                    queryParams.append('domains', 'euronews.com,politico.eu,ft.com,reuters.com');
+                    apiUrl += `&domains=euronews.com,politico.eu,ft.com,reuters.com`;
                     break;
             }
         }
 
-        queryParams.append('q', keywords);
+        // Add API key
+        apiUrl += `&apiKey=${NEWS_API_KEY}`;
 
-        const apiUrl = `${baseUrl}?${queryParams.toString()}`;
         const response = await fetch(apiUrl);
 
         if (!response.ok) {
@@ -131,14 +120,11 @@ function determineSector(article: any, category: string): string {
 function generateAnalysis(article: any, category: string) {
     const text = `${article.title} ${article.description}`.toLowerCase();
     
-    // Generate relevant insights based on category
-    const insights = [
-        generatePrimaryInsight(text, category),
-        generateSecondaryInsight(text, category)
-    ].filter(Boolean);
-
     return {
-        keyInsights: insights,
+        keyInsights: [
+            generatePrimaryInsight(text, category),
+            generateSecondaryInsight(text, category)
+        ],
         implications: {
             shortTerm: generateShortTermImplication(text, category),
             longTerm: generateLongTermImplication(text, category)
