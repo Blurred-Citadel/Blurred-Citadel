@@ -85,43 +85,9 @@ export default function Home() {
     </button>
   )
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white p-8">
-        <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
-          <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
-            Blurred Citadel
-          </span>
-        </h1>
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white p-8">
-        <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
-          <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
-            Blurred Citadel
-          </span>
-        </h1>
-        <div className="bg-red-50 text-red-600 p-4 rounded">{error}</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-white p-8">
-      <h1 className="text-4xl font-extrabold mb-8 tracking-tight">
-        <span className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-800 bg-clip-text text-transparent">
-          Blurred Citadel
-        </span>
-      </h1>
-
-      {/* Filters Section */}
+  const MainContent = () => (
+    <div className="container mx-auto px-4 py-6">
       <div className="mb-8 space-y-4">
-        {/* Categories */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 mb-2">Category Focus</h2>
           <div className="flex flex-wrap gap-2">
@@ -137,7 +103,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Regions */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 mb-2">Geographic Region</h2>
           <div className="flex flex-wrap gap-2">
@@ -153,7 +118,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Active Filters Display */}
         <div className="pt-2">
           <div className="text-sm text-gray-500">
             Showing: {' '}
@@ -175,17 +139,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* News Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {news.map((item, index) => (
           <div key={index}>
-            {/* Regular Card */}
             <div 
               className="bg-gray-50 shadow rounded-lg transition-all duration-300 h-[400px] cursor-pointer hover:shadow-lg border border-gray-200"
               onClick={() => toggleCard(index)}
             >
               <div className="p-4 h-full flex flex-col">
-                {/* Card Header */}
                 <div className="flex-none">
                   <h2 className="text-lg font-semibold text-gray-900 mb-2">
                     {item.title}
@@ -220,7 +181,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Card Content */}
                 <div className="flex-grow overflow-hidden">
                   <p className="text-sm text-gray-600 line-clamp-3">{item.description}</p>
                   {item.analysis && (
@@ -230,14 +190,12 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Card Footer */}
                 <div className="mt-4 pt-4 border-t text-xs text-gray-500">
                   {item.source} • {new Date(item.publishedAt).toLocaleDateString()}
                 </div>
               </div>
             </div>
 
-            {/* Expanded Card Modal */}
             {expandedCard === index && (
               <>
                 <div 
@@ -248,7 +206,6 @@ export default function Home() {
                              bg-gray-50 rounded-lg shadow-xl z-50 w-[90%] max-w-6xl max-h-[80vh] 
                              overflow-y-auto border border-gray-200">
                   <div className="p-6">
-                    {/* Close Button */}
                     <button 
                       onClick={() => toggleCard(index)}
                       className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -258,9 +215,7 @@ export default function Home() {
                       </svg>
                     </button>
 
-                    {/* Content */}
                     <div className="grid grid-cols-3 gap-6">
-                      {/* Left Column */}
                       <div className="col-span-1">
                         <h2 className="text-xl font-bold text-gray-900 mb-4">{item.title}</h2>
                         <div className="flex flex-wrap gap-2 mb-4">
@@ -292,7 +247,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Right Column */}
                       <div className="col-span-2">
                         {item.analysis && (
                           <div className="space-y-6">
@@ -330,7 +284,7 @@ export default function Home() {
                                     {trend}
                                   </span>
                                 ))}
-                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -343,6 +297,40 @@ export default function Home() {
           </div>
         ))}
       </div>
+    </div>
+  );
+
+  const content = loading ? (
+    <div className="text-center py-10">Loading...</div>
+  ) : error ? (
+    <div className="bg-red-50 text-red-600 p-4 rounded">{error}</div>
+  ) : (
+    <MainContent />
+  );
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="bg-black text-white">
+        <div className="container mx-auto px-4">
+          <h1 className="text-2xl font-bold py-4">Blurred Citadel</h1>
+        </div>
+      </header>
+
+      {/* Navigation Bar */}
+      <nav className="bg-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="flex space-x-4 py-3">
+            <a href="#" className="text-white hover:text-gray-300">News</a>
+            <a href="#" className="text-gray-300 hover:text-white">Knowledge Base</a>
+            <a href="#" className="text-gray-300 hover:text-white">Reports</a>
+            <a href="#" className="text-gray-300 hover:text-white">Analytics</a>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      {content}
     </div>
   )
 }
