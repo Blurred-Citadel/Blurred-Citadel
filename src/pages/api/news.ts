@@ -63,8 +63,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const regionParam = Array.isArray(req.query.region)
             ? req.query.region[0]
             : req.query.region || 'global';
-
-        console.log('Processed params:', { categoryParam, regionParam });
         
         const categoryKeywords = {
             ai: 'artificial intelligence recruitment OR ai hiring trends OR automation workforce',
@@ -98,72 +96,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         apiUrl += `&apiKey=${NEWS_API_KEY}`;
-        
-        console.log('Fetching from NewsAPI:', apiUrl.replace(NEWS_API_KEY!, '[API_KEY]'));
+
+        console.log('Fetching from NewsAPI:', apiUrl.replace(NEWS_API_KEY || '', '[API_KEY]'));
 
         const response = await fetch(apiUrl);
         console.log('NewsAPI response status:', response.status);
 
         if (!response.ok) {
-            throw new Error(`NewsAPI error: ${response.status} - ${await response.text()}`);
+            throw new Error(`NewsAPI error: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('NewsAPI response received:', {
-            status: response.status,
-            articleCount: data.articles?.length || 0
-        });
 
         if (!data.articles || !Array.isArray(data.articles)) {
             throw new Error('Invalid response format from NewsAPI');
         }
 
-        console.log('Starting to process articles...');
+        const articles = data.articles
+            .filter((article: NewsApiArticle) => 
+                article.title && 
+                article.description && 
+                article.url && 
+                !article.title.includes('Removed') && 
+                !article.title.includes('[Removed]')
+            )
+            .slice(0, 12);
 
-        const articles = await Promise.all(
-            data.articles
-                .filter((article: NewsApiArticle) => 
-                    article.title && 
-                    article.description && 
-                    article.url && 
-                    !article.title.includes('Removed') && 
-                    !article.title.includes('[Removed]')
-                )
-                .slice(0, 12)
-                .map(async (article: NewsApiArticle): Promise<ProcessedArticle> => {
-                    console.log('Processing article:', article.title);
-                    const aiAnalysis = await analyzeWithAI(article, categoryParam);
-                    
-                    return {
-                        title: article.title,
-                        description: article.description,
-                        url: article.url,
-                        source: article.source?.name || 'Unknown',
-                        publishedAt: article.publishedAt,
-                        impact: aiAnalysis?.impact || 'Medium',
-                        sector: aiAnalysis?.sector || determineSector(article, categoryParam),
-                        analysis: {
-                            keyInsights: aiAnalysis?.keyInsights || generateCategorySpecificInsights(article, categoryParam),
-                            implications: {
-                                shortTerm: aiAnalysis?.implications?.shortTerm || generateShortTermImplication(article, categoryParam),
-                                longTerm: aiAnalysis?.implications?.longTerm || generateLongTermImplication(article, categoryParam)
-                            },
-                            relevanceScore: aiAnalysis?.relevanceScore || 5,
-                            workforceTrends: aiAnalysis?.workforceTrends || generateCategorySpecificTrends(article, categoryParam)
-                        }
-                    };
-                })
+        console.log(`Processing ${articles.length} articles`);
+
+        const processedArticles = await Promise.all(
+            articles.map(async (article: NewsApiArticle): Promise<ProcessedArticle> => {
+                console.log('Processing article:', article.title);
+                let aiAnalysis = null;
+                
+                try {
+                    aiAnalysis = await analyzeWithAI(article, categoryParam);
+                } catch (error) {
+                    console.error('Error analyzing article:', article.title, error);
+                }
+
+                return {
+                    title: article.title,
+                    description: article.description,
+                    url: article.url,
+                    source: article.source?.name || 'Unknown',
+                    publishedAt: article.publishedAt,
+                    impact: aiAnalysis?.impact || determineSector(article, categoryParam),
+                    sector: aiAnalysis?.sector || determineSector(article, categoryParam),
+                    analysis: {
+                        keyInsights: aiAnalysis?.keyInsights || generateInsights(categoryParam),
+                        implications: {
+                            shortTerm: aiAnalysis?.implications?.shortTerm || 'Analysis in progress',
+                            longTerm: aiAnalysis?.implications?.longTerm || 'Analysis in progress'
+                        },
+                        relevanceScore: aiAnalysis?.relevanceScore || 5,
+                        workforceTrends: aiAnalysis?.workforceTrends || generateTrends(categoryParam)
+                    }
+                };
+            })
         );
 
-        console.log('Successfully processed articles:', articles.length);
-        res.status(200).json(articles);
+        res.status(200).json(processedArticles);
 
     } catch (error) {
-        console.error('Full API Error:', {
-            error,
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : 'No stack trace'
-        });
+        console.error('API Error:', error);
         res.status(500).json({ 
             error: 'Failed to fetch news',
             details: error instanceof Error ? error.message : 'Unknown error'
@@ -173,95 +169,104 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function analyzeWithAI(article: NewsApiArticle, category: string): Promise<AIAnalysisResponse | null> {
     try {
-        console.log('Starting AI analysis for:', article.title);
         const prompt = `
-As a staffing industry expert, analyze this workforce-related news article:
+Analyze this workforce industry news article:
 
-TITLE: ${article.title}
-DESCRIPTION: ${article.description}
-CATEGORY: ${category}
+Title: ${article.title}
+Description: ${article.description}
+Category: ${category}
 
-Provide a detailed analysis specifically for staffing industry professionals in this exact JSON format:
+Provide analysis in JSON format:
 {
     "impact": "High/Medium/Low",
     "sector": "Technology/Healthcare/Finance/Manufacturing/Professional Services/Engineering/Cross-Industry",
-    "keyInsights": [
-        "First key insight with specific details",
-        "Second key insight with specific details",
-        "Third key insight with specific details"
-    ],
+    "keyInsights": ["insight1", "insight2"],
     "implications": {
-        "shortTerm": "Detailed description of immediate implications for staffing firms (next 3-6 months)",
-        "longTerm": "Detailed description of long-term strategic implications (12-24 months)"
+        "shortTerm": "immediate impact",
+        "longTerm": "long term impact"
     },
     "relevanceScore": 8,
-    "workforceTrends": [
-        "First specific trend identified",
-        "Second specific trend identified",
-        "Third specific trend identified"
-    ]
-}
+    "workforceTrends": ["trend1", "trend2"]
+}`;
 
-Consider:
-1. Immediate impact on staffing/recruitment operations
-2. Changes in client hiring patterns
-3. Skills and talent implications
-4. Market opportunities for staffing providers
-5. Competitive considerations
-6. Risk factors and mitigation strategies
-
-Ensure all insights and implications are:
-- Specific to the staffing industry
-- Actionable for staffing professionals
-- Based on the actual content of the article
-- Detailed and concrete, not generic
-`;
-
-        const response = await openai.chat.completions.create({
+        const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: [
                 {
                     role: "system",
-                    content: "You are a senior analyst specializing in workforce solutions and staffing industry trends. Your analyses are specific, actionable, and directly relevant to staffing industry professionals. Avoid generic responses. Base all insights on the specific article content provided."
+                    content: "You are an expert analyst specializing in workforce solutions and recruitment industry trends."
                 },
                 {
                     role: "user",
                     content: prompt
                 }
             ],
-            temperature: 0.5,
+            temperature: 0.7,
         });
 
         console.log('Received AI response for:', article.title);
 
-        const content = response.choices[0].message.content;
+        const content = completion.choices[0].message.content;
         if (!content) {
             throw new Error('Empty response from OpenAI');
         }
 
-        let analysis = JSON.parse(content) as AIAnalysisResponse;
-
-        // Validate and clean the response
-        analysis = {
-            impact: analysis.impact || 'Medium',
-            sector: analysis.sector || 'Cross-Industry',
-            keyInsights: analysis.keyInsights?.slice(0, 3).filter(Boolean) || [],
-            implications: {
-                shortTerm: analysis.implications?.shortTerm || 'Immediate analysis pending',
-                longTerm: analysis.implications?.longTerm || 'Long-term analysis pending'
-            },
-            relevanceScore: Math.min(Math.max(analysis.relevanceScore || 5, 1), 10),
-            workforceTrends: analysis.workforceTrends?.slice(0, 3).filter(Boolean) || []
-        };
-
-        console.log('Completed AI analysis for:', article.title);
-        return analysis;
+        return JSON.parse(content) as AIAnalysisResponse;
 
     } catch (error) {
-        console.error('AI Analysis Error for article:', article.title, error);
+        console.error('AI Analysis Error:', error);
         return null;
     }
 }
 
-// Rest of the helper functions remain the same...
-[Previous helper functions for determineSector, generateCategorySpecificInsights, etc. remain unchanged]
+function determineSector(article: NewsApiArticle, category: string): string {
+    const text = `${article.title} ${article.description}`.toLowerCase();
+    
+    if (category === 'ai') return 'Technology';
+    if (category === 'stem') {
+        if (text.includes('engineering')) return 'Engineering';
+        if (text.includes('tech')) return 'Technology';
+        return 'STEM';
+    }
+    
+    const sectorMap = {
+        'Technology': ['tech', 'digital', 'software', 'ai', 'automation'],
+        'Healthcare': ['health', 'medical', 'healthcare'],
+        'Finance': ['banking', 'financial', 'finance'],
+        'Manufacturing': ['manufacturing', 'industrial'],
+        'Professional Services': ['consulting', 'professional services'],
+        'Engineering': ['engineering', 'construction']
+    };
+
+    for (const [sector, keywords] of Object.entries(sectorMap)) {
+        if (keywords.some(keyword => text.includes(keyword))) {
+            return sector;
+        }
+    }
+
+    return 'Cross-Industry';
+}
+
+function generateInsights(category: string): string[] {
+    const insights = {
+        ai: ['AI impact on recruitment', 'Automation trends in staffing'],
+        labor: ['Labor market shifts', 'Employment trend analysis'],
+        msp: ['MSP service evolution', 'Workforce solution developments'],
+        stem: ['Technical talent demands', 'STEM recruitment challenges'],
+        default: ['Market development analysis', 'Industry trend assessment']
+    };
+
+    return insights[category as keyof typeof insights] || insights.default;
+}
+
+function generateTrends(category: string): string[] {
+    const trends = {
+        ai: ['AI in Recruitment', 'Automation Integration'],
+        labor: ['Workforce Evolution', 'Employment Patterns'],
+        msp: ['Service Innovation', 'Solution Development'],
+        stem: ['Technical Demands', 'Skill Requirements'],
+        default: ['Market Evolution', 'Industry Development']
+    };
+
+    return trends[category as keyof typeof trends] || trends.default;
+}
