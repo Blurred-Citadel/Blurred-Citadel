@@ -1,3 +1,6 @@
+import { NextApiRequest, NextApiResponse } from 'next'
+import OpenAI from 'openai'
+
 // ... (previous code remains the same until the handler function)
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
