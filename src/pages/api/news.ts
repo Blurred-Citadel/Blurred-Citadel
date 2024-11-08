@@ -2,11 +2,40 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 
+// Define types
+type NewsApiArticle = {
+    title: string;
+    description: string;
+    url: string;
+    source: {
+        name: string;
+    };
+    publishedAt: string;
+}
+
+type ProcessedArticle = {
+    title: string;
+    description: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+    impact: string;
+    sector: string;
+    analysis: {
+        keyInsights: string[];
+        implications: {
+            shortTerm: string;
+            longTerm: string;
+        };
+        relevanceScore: number;
+        workforceTrends: string[];
+    };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
         const { category = 'all', region = 'global' } = req.query;
         
-        // More focused keywords for each category
         const categoryKeywords = {
             ai: 'artificial intelligence recruitment OR ai hiring trends OR automation workforce',
             labor: '"labor market" OR "employment trends" OR "workforce statistics"',
@@ -18,16 +47,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const keywords = categoryKeywords[category as keyof typeof categoryKeywords] || categoryKeywords.all;
 
-        // Construct the base URL
         let apiUrl = 'https://newsapi.org/v2/everything?';
-        
-        // Add standard parameters
         apiUrl += `q=${encodeURIComponent(keywords)}`;
         apiUrl += `&language=en`;
         apiUrl += `&sortBy=relevancy`;
         apiUrl += `&pageSize=20`;
         
-        // Add region-specific parameters
         if (region !== 'global') {
             switch(region) {
                 case 'uk':
@@ -42,7 +67,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }
 
-        // Add API key
         apiUrl += `&apiKey=${NEWS_API_KEY}`;
 
         const response = await fetch(apiUrl);
@@ -57,16 +81,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             throw new Error('Invalid response format from NewsAPI');
         }
 
-        // Process and filter articles
         const articles = data.articles
-            .filter(article => 
+            .filter((article: NewsApiArticle) => 
                 article.title && 
                 article.description && 
                 article.url && 
                 !article.title.includes('Removed') && 
                 !article.title.includes('[Removed]')
             )
-            .map(article => ({
+            .map((article: NewsApiArticle): ProcessedArticle => ({
                 title: article.title,
                 description: article.description,
                 url: article.url,
@@ -76,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 sector: determineSector(article, category as string),
                 analysis: generateAnalysis(article, category as string)
             }))
-            .slice(0, 12); // Take the top 12 most relevant articles
+            .slice(0, 12);
 
         res.status(200).json(articles);
 
@@ -86,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 }
 
-function determineImpact(article: any): string {
+function determineImpact(article: NewsApiArticle): string {
     const text = `${article.title} ${article.description}`.toLowerCase();
     const highImpactTerms = ['major', 'significant', 'breakthrough', 'critical', 'urgent'];
     const mediumImpactTerms = ['new', 'update', 'change', 'develop'];
@@ -96,7 +119,7 @@ function determineImpact(article: any): string {
     return 'Low';
 }
 
-function determineSector(article: any, category: string): string {
+function determineSector(article: NewsApiArticle, category: string): string {
     const text = `${article.title} ${article.description}`.toLowerCase();
     
     const sectorMap = {
@@ -117,7 +140,7 @@ function determineSector(article: any, category: string): string {
     return 'General';
 }
 
-function generateAnalysis(article: any, category: string) {
+function generateAnalysis(article: NewsApiArticle, category: string) {
     const text = `${article.title} ${article.description}`.toLowerCase();
     
     return {
@@ -219,7 +242,6 @@ function getCategoryRelevantTerms(category: string): string[] {
 function generateTrends(text: string, category: string): string[] {
     const trends = new Set<string>();
     
-    // Add category-specific trends
     switch(category) {
         case 'ai':
             trends.add('AI in Recruitment');
@@ -238,7 +260,6 @@ function generateTrends(text: string, category: string): string[] {
             break;
     }
     
-    // Add context-based trends
     if (text.includes('remote')) trends.add('Remote Work');
     if (text.includes('digital')) trends.add('Digital Transformation');
     if (text.includes('skill')) trends.add('Skills Gap');
