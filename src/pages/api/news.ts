@@ -1,3 +1,55 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
+import OpenAI from 'openai'
+
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+const openai = new OpenAI({
+    apiKey: OPENAI_API_KEY
+});
+
+// Type definitions
+type NewsApiArticle = {
+    title: string;
+    description: string;
+    url: string;
+    source: {
+        name: string;
+    };
+    publishedAt: string;
+}
+
+type ProcessedArticle = {
+    title: string;
+    description: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+    impact: string;
+    sector: string;
+    analysis: {
+        keyInsights: string[];
+        implications: {
+            shortTerm: string;
+            longTerm: string;
+        };
+        relevanceScore: number;
+        workforceTrends: string[];
+    };
+}
+
+type AIAnalysisResponse = {
+    impact: string;
+    sector: string;
+    keyInsights: string[];
+    implications: {
+        shortTerm: string;
+        longTerm: string;
+    };
+    relevanceScore: number;
+    workforceTrends: string[];
+}
+
 async function analyzeWithAI(article: NewsApiArticle, category: string): Promise<AIAnalysisResponse | null> {
     try {
         const prompt = `
@@ -9,10 +61,9 @@ CATEGORY: ${category}
 
 Provide a detailed analysis specifically for staffing industry professionals in this exact JSON format:
 {
-    "impact": "High/Medium/Low", // Rate based on significance to staffing/recruitment industry
-    "sector": "Technology/Healthcare/Finance/Manufacturing/Professional Services/Engineering/Cross-Industry", // Choose ONE most relevant sector
+    "impact": "High/Medium/Low",
+    "sector": "Technology/Healthcare/Finance/Manufacturing/Professional Services/Engineering/Cross-Industry",
     "keyInsights": [
-        // 3 specific, actionable insights for staffing professionals based on this news
         "First key insight with specific details",
         "Second key insight with specific details",
         "Third key insight with specific details"
@@ -21,9 +72,8 @@ Provide a detailed analysis specifically for staffing industry professionals in 
         "shortTerm": "Detailed description of immediate implications for staffing firms (next 3-6 months)",
         "longTerm": "Detailed description of long-term strategic implications (12-24 months)"
     },
-    "relevanceScore": 8, // Rate 1-10 for staffing industry relevance
+    "relevanceScore": 8,
     "workforceTrends": [
-        // 2-3 specific trends identified in the article
         "First specific trend identified",
         "Second specific trend identified",
         "Third specific trend identified"
@@ -46,7 +96,7 @@ Ensure all insights and implications are:
 `;
 
         const response = await openai.chat.completions.create({
-            model: "gpt-4", // Using GPT-4 for better analysis
+            model: "gpt-4",
             messages: [
                 {
                     role: "system",
@@ -57,7 +107,7 @@ Ensure all insights and implications are:
                     content: prompt
                 }
             ],
-            temperature: 0.5, // Lower temperature for more focused responses
+            temperature: 0.5,
         });
 
         const content = response.choices[0].message.content;
@@ -107,7 +157,95 @@ Ensure all insights and implications are:
     }
 }
 
-// New helper functions for better fallback content
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    try {
+        const { category = 'all', region = 'global' } = req.query;
+        
+        const categoryKeywords = {
+            ai: 'artificial intelligence recruitment OR ai hiring trends OR automation workforce',
+            labor: '"labor market" OR "employment trends" OR "workforce statistics"',
+            msp: '"managed service provider" OR "recruitment process outsourcing" OR MSP staffing',
+            stem: '"STEM recruitment" OR "engineering talent" OR "technology staffing"',
+            chomsky: '"workforce inequality" OR "labor rights" OR "worker conditions"',
+            all: 'workforce solutions OR recruitment trends OR employment',
+        };
+
+        const keywords = categoryKeywords[category as keyof typeof categoryKeywords] || categoryKeywords.all;
+
+        let apiUrl = 'https://newsapi.org/v2/everything?';
+        apiUrl += `q=${encodeURIComponent(keywords)}`;
+        apiUrl += `&language=en`;
+        apiUrl += `&sortBy=relevancy`;
+        apiUrl += `&pageSize=20`;
+        
+        if (region !== 'global') {
+            switch(region) {
+                case 'uk':
+                    apiUrl += `&domains=bbc.co.uk,theguardian.com,telegraph.co.uk,ft.com`;
+                    break;
+                case 'usa':
+                    apiUrl += `&domains=wsj.com,nytimes.com,bloomberg.com,reuters.com`;
+                    break;
+                case 'eu':
+                    apiUrl += `&domains=euronews.com,politico.eu,ft.com,reuters.com`;
+                    break;
+            }
+        }
+
+        apiUrl += `&apiKey=${NEWS_API_KEY}`;
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error(`NewsAPI error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.articles || !Array.isArray(data.articles)) {
+            throw new Error('Invalid response format from NewsAPI');
+        }
+
+        const articles = await Promise.all(
+            data.articles
+                .filter((article: NewsApiArticle) => 
+                    article.title && 
+                    article.description && 
+                    article.url && 
+                    !article.title.includes('Removed') && 
+                    !article.title.includes('[Removed]')
+                )
+                .slice(0, 12)
+                .map(async (article: NewsApiArticle): Promise<ProcessedArticle> => {
+                    const aiAnalysis = await analyzeWithAI(article, category as string);
+                    
+                    return {
+                        title: article.title,
+                        description: article.description,
+                        url: article.url,
+                        source: article.source?.name || 'Unknown',
+                        publishedAt: article.publishedAt,
+                        impact: aiAnalysis?.impact || 'Medium',
+                        sector: aiAnalysis?.sector || determineSector(article, category as string),
+                        analysis: {
+                            keyInsights: aiAnalysis?.keyInsights || generateCategorySpecificInsights(article, category),
+                            implications: {
+                                shortTerm: aiAnalysis?.implications?.shortTerm || generateShortTermImplication(article, category),
+                                longTerm: aiAnalysis?.implications?.longTerm || generateLongTermImplication(article, category)
+                            },
+                            relevanceScore: aiAnalysis?.relevanceScore || 5,
+                            workforceTrends: aiAnalysis?.workforceTrends || generateCategorySpecificTrends(article, category)
+                        }
+                    };
+                })
+        );
+
+        res.status(200).json(articles);
+
+    } catch (error) {
+        console.error('API Error:', error);
+        res.status(500).json({ error: 'Failed to fetch news' });
+    }
+}
+
 function generateCategorySpecificInsights(article: NewsApiArticle, category: string): string[] {
     const text = `${article.title} ${article.description}`.toLowerCase();
     const insights = [];
@@ -186,7 +324,6 @@ function generateCategorySpecificTrends(article: NewsApiArticle, category: strin
     const text = `${article.title} ${article.description}`.toLowerCase();
     const trends = new Set<string>();
 
-    // Add category-specific trend
     switch(category) {
         case 'ai':
             trends.add('AI in Recruitment Automation');
@@ -204,7 +341,6 @@ function generateCategorySpecificTrends(article: NewsApiArticle, category: strin
             trends.add('Recruitment Market Evolution');
     }
 
-    // Add context-based trends
     if (text.includes('remote')) trends.add('Remote Work Integration');
     if (text.includes('digital')) trends.add('Digital Transformation');
     if (text.includes('skill')) trends.add('Skills Gap Challenges');
@@ -213,4 +349,32 @@ function generateCategorySpecificTrends(article: NewsApiArticle, category: strin
     if (text.includes('talent')) trends.add('Talent Strategy Evolution');
 
     return Array.from(trends).slice(0, 3);
+}
+
+function determineSector(article: NewsApiArticle, category: string): string {
+    const text = `${article.title} ${article.description}`.toLowerCase();
+    
+    if (category === 'ai') return 'Technology';
+    if (category === 'stem') {
+        if (text.includes('engineering')) return 'Engineering';
+        if (text.includes('tech')) return 'Technology';
+        return 'STEM';
+    }
+    
+    const sectorMap = {
+        'Technology': ['tech', 'digital', 'software', 'ai', 'automation'],
+        'Healthcare': ['health', 'medical', 'healthcare'],
+        'Finance': ['banking', 'financial', 'finance'],
+        'Manufacturing': ['manufacturing', 'industrial'],
+        'Professional Services': ['consulting', 'professional services'],
+        'Engineering': ['engineering', 'construction']
+    };
+
+    for (const [sector, keywords] of Object.entries(sectorMap)) {
+        if (keywords.some(keyword => text.includes(keyword))) {
+            return sector;
+        }
+    }
+
+    return 'Cross-Industry';
 }
