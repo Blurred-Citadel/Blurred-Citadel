@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 type NewsItem = {
   title: string
@@ -321,10 +322,10 @@ export default function Home() {
       <nav className="bg-gray-800">
         <div className="container mx-auto px-4">
           <div className="flex space-x-4 py-3">
-            <a href="#" className="text-white hover:text-gray-300">News</a>
-            <a href="#" className="text-gray-300 hover:text-white">Knowledge Base</a>
-            <a href="#" className="text-gray-300 hover:text-white">Reports</a>
-            <a href="#" className="text-gray-300 hover:text-white">Analytics</a>
+            <Link href="/" className="text-white">News</Link>
+            <Link href="/knowledge-base" className="text-gray-300 hover:text-white">Knowledge Base</Link>
+            <Link href="#" className="text-gray-300 hover:text-white">Reports</Link>
+            <Link href="#" className="text-gray-300 hover:text-white">Analytics</Link>
           </div>
         </div>
       </nav>
