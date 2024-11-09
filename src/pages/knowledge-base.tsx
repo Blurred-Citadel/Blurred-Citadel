@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import Link from 'next/link'
 
 type KnowledgeItem = {
     id: string;
@@ -16,7 +17,7 @@ const sampleKnowledge: KnowledgeItem[] = [
     {
         id: '1',
         title: 'AI Impact on Technical Recruitment',
-        content: 'Analysis of how AI is transforming technical recruitment processes...',
+        content: 'Analysis of how AI is transforming technical recruitment processes and changing the way organizations identify and assess talent. Key areas include automated screening, predictive analytics for candidate success, and AI-driven interview processes.',
         category: 'Technology',
         tags: ['AI', 'recruitment', 'automation'],
         connections: ['2', '4'],
@@ -26,7 +27,7 @@ const sampleKnowledge: KnowledgeItem[] = [
     {
         id: '2',
         title: 'Remote Work Trends 2024',
-        content: 'Key trends in remote work adoption and impact on workforce...',
+        content: 'Comprehensive analysis of remote work adoption trends and their impact on workforce management. Includes data on productivity metrics, collaboration tools, and emerging challenges in virtual team management.',
         category: 'Workforce Trends',
         tags: ['remote work', 'workforce', 'trends'],
         connections: ['1', '3'],
@@ -36,7 +37,7 @@ const sampleKnowledge: KnowledgeItem[] = [
     {
         id: '3',
         title: 'MSP Market Evolution',
-        content: 'Analysis of changing MSP service delivery models...',
+        content: 'Deep dive into the changing landscape of Managed Service Provider models. Explores new service delivery approaches, technology integration, and evolving client expectations in the MSP space.',
         category: 'MSP',
         tags: ['MSP', 'service delivery', 'market trends'],
         connections: ['2'],
@@ -46,7 +47,7 @@ const sampleKnowledge: KnowledgeItem[] = [
     {
         id: '4',
         title: 'Skills Gap Analysis 2024',
-        content: 'Comprehensive analysis of current skills gaps in technology sector...',
+        content: 'Detailed analysis of current skills gaps in the technology sector, including emerging technical requirements, training needs, and strategies for addressing skill shortages in the modern workforce.',
         category: 'Skills',
         tags: ['skills', 'technology', 'training'],
         connections: ['1'],
@@ -60,7 +61,7 @@ export default function KnowledgeBase() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    const categories = ['all', ...new Set(sampleKnowledge.map(item => item.category))];
+    const categories = ['all', ...Array.from(new Set(sampleKnowledge.map(item => item.category)))];
 
     const filteredItems = sampleKnowledge.filter(item => {
         const matchesSearch = 
@@ -92,10 +93,10 @@ export default function KnowledgeBase() {
             <nav className="bg-gray-800">
                 <div className="container mx-auto px-4">
                     <div className="flex space-x-4 py-3">
-                        <a href="/" className="text-gray-300 hover:text-white">News</a>
-                        <a href="/knowledge-base" className="text-white">Knowledge Base</a>
-                        <a href="#" className="text-gray-300 hover:text-white">Reports</a>
-                        <a href="#" className="text-gray-300 hover:text-white">Analytics</a>
+                        <Link href="/" className="text-gray-300 hover:text-white">News</Link>
+                        <Link href="/knowledge-base" className="text-white">Knowledge Base</Link>
+                        <Link href="#" className="text-gray-300 hover:text-white">Reports</Link>
+                        <Link href="#" className="text-gray-300 hover:text-white">Analytics</Link>
                     </div>
                 </div>
             </nav>
