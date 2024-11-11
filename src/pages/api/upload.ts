@@ -1,13 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import formidable from 'formidable';
-import fs from 'fs';
-import path from 'path';
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,40 +9,20 @@ export default async function handler(
   }
 
   try {
-    const form = formidable({
-      uploadDir: path.join(process.cwd(), 'public', 'uploads'),
-      keepExtensions: true,
-      maxFiles: 5,
-      maxFileSize: 10 * 1024 * 1024, // 10MB
-    });
-
-    // Create uploads directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const [fields, files] = await form.parse(req);
-
-    // Process the uploaded files
-    const uploadedFiles = Array.isArray(files.documents) 
-      ? files.documents 
-      : [files.documents];
-
-    const fileDetails = uploadedFiles.map(file => ({
-      name: file.originalFilename,
-      size: file.size,
-      path: file.filepath,
-    }));
-
+    // For now, we'll just acknowledge receipt of the files
+    // In a real application, you'd want to integrate with a file storage service
+    // like AWS S3, Google Cloud Storage, or similar
+    
     res.status(200).json({ 
-      message: 'Files uploaded successfully',
-      files: fileDetails 
+      message: 'Files received successfully',
+      // Echo back some basic info about the request
+      receivedAt: new Date().toISOString(),
+      contentType: req.headers['content-type'],
     });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ 
-      error: 'Error uploading files',
+      error: 'Error processing files',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
