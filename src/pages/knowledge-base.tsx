@@ -1,16 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-
-type KnowledgeItem = {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  connections: string[];
-  dateAdded: string;
-  lastUpdated: string;
-}
+import type { KnowledgeItem } from '../types';
 
 // Sample data - later we'll move this to a database
 const sampleKnowledge: KnowledgeItem[] = [
@@ -106,7 +96,6 @@ export default function KnowledgeBase() {
 
       const result = await response.json();
       setUploadSuccess(true);
-      // You could refresh the knowledge base items here if needed
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Failed to upload documents');
     } finally {
