@@ -1,87 +1,86 @@
 import React, { useState } from 'react';
-import { KnowledgeProcessor } from './knowledgeProcessing';
 
-interface DocumentUploadProps {
-  onUpload: (processedItem: any) => void;
+interface ProcessedItem {
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUpload }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState('');
+interface DocumentUploadProps {
+  onUpload: (item: ProcessedItem) => void;
+}
 
-  const handleFileDrop = async (e: React.DragEvent<HTMLDivElement> | React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    setIsProcessing(true);
-    setError('');
+export default function DocumentUpload({ onUpload }: DocumentUploadProps) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const files = 'dataTransfer' in e 
-      ? e.dataTransfer?.files 
-      : (e.target as HTMLInputElement).files;
-      
-    if (!files?.length) return;
+  const processDocument = async (file: File): Promise<ProcessedItem> => {
+    // Basic document processing
+    const text = await file.text();
+    return {
+      title: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+      content: text,
+      category: 'Uncategorized',
+      tags: []
+    };
+  };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      const file = files[0];
-      const text = await file.text();
+      setUploading(true);
+      setError(null);
       
-      const processor = new KnowledgeProcessor();
-      const processedItem = await processor.processDocument(
-        text,
-        'pdf',
-        null
-      );
+      const file = event.target.files?.[0];
+      if (!file) {
+        throw new Error('No file selected');
+      }
+
+      // Check file type
+      if (!file.type.match('text/*') && file.type !== 'application/pdf') {
+        throw new Error('Only text and PDF files are supported');
+      }
+
+      const processedItem = await processDocument(file);
       onUpload(processedItem);
     } catch (err) {
-      setError('Failed to process document');
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to upload document');
     } finally {
-      setIsProcessing(false);
+      setUploading(false);
     }
   };
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={handleFileDrop}
-      className={`p-8 border-2 border-dashed rounded-lg text-center
-        ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}
-        ${isProcessing ? 'opacity-50' : ''}`}
-    >
-      <input
-        type="file"
-        accept=".pdf,.doc,.docx,.txt"
-        onChange={handleFileDrop}
-        className="hidden"
-        id="file-upload"
-      />
-      <label htmlFor="file-upload" className="cursor-pointer">
-        <div className="space-y-2">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <div className="text-sm text-gray-600">
-            {isProcessing ? (
-              "Processing document..."
-            ) : (
-              <>
-                <span className="text-blue-600">Upload a file</span> or drag and drop
-              </>
-            )}
-          </div>
-          <div className="text-xs text-gray-500">
-            PDF, DOC, DOCX, TXT up to 10MB
-          </div>
-        </div>
-      </label>
-      {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
+    <div className="p-4 border rounded-lg">
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Upload Document
+        </label>
+        <input
+          type="file"
+          accept=".txt,.pdf"
+          onChange={handleFileUpload}
+          disabled={uploading}
+          className="block w-full text-sm text-gray-500
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-blue-50 file:text-blue-700
+            hover:file:bg-blue-100"
+        />
+      </div>
+      
+      {uploading && (
+        <div className="text-sm text-gray-600">Processing document...</div>
+      )}
+      
+      {error && (
+        <div className="text-sm text-red-600">{error}</div>
+      )}
+      
+      <div className="mt-2 text-xs text-gray-500">
+        Supported formats: .txt, .pdf
+      </div>
     </div>
   );
-};
-
-export default DocumentUpload;
+}
