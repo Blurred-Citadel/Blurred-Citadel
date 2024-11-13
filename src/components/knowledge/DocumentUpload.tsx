@@ -1,86 +1,112 @@
 import React, { useState } from 'react';
+import { AlertCircle, Upload, CheckCircle2, XCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-interface ProcessedItem {
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-}
+const FileUpload = () => {
+  const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fileName, setFileName] = useState('');
 
-interface DocumentUploadProps {
-  onUpload: (item: ProcessedItem) => void;
-}
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-export default function DocumentUpload({ onUpload }: DocumentUploadProps) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+    setFileName(file.name);
+    setUploadStatus('uploading');
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', file);
 
-  const processDocument = async (file: File): Promise<ProcessedItem> => {
-    // Basic document processing
-    const text = await file.text();
-    return {
-      title: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-      content: text,
-      category: 'Uncategorized',
-      tags: []
-    };
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      setUploading(true);
-      setError(null);
-      
-      const file = event.target.files?.[0];
-      if (!file) {
-        throw new Error('No file selected');
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
       }
 
-      // Check file type
-      if (!file.type.match('text/*') && file.type !== 'application/pdf') {
-        throw new Error('Only text and PDF files are supported');
-      }
-
-      const processedItem = await processDocument(file);
-      onUpload(processedItem);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload document');
-    } finally {
-      setUploading(false);
+      setUploadStatus('success');
+    } catch (error) {
+      setUploadStatus('error');
+      setErrorMessage(error.message || 'Failed to upload file. Please try again.');
     }
   };
 
   return (
-    <div className="p-4 border rounded-lg">
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Upload Document
-        </label>
-        <input
-          type="file"
-          accept=".txt,.pdf"
-          onChange={handleFileUpload}
-          disabled={uploading}
-          className="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
-            file:text-sm file:font-semibold
-            file:bg-blue-50 file:text-blue-700
-            hover:file:bg-blue-100"
-        />
+    <div className="w-full max-w-md mx-auto p-6">
+      <div className="mb-6">
+        <label 
+          htmlFor="file-upload"
+          className={`
+            relative flex flex-col items-center justify-center w-full h-64 
+            border-2 border-dashed rounded-lg cursor-pointer 
+            ${uploadStatus === 'error' ? 'border-red-300 bg-red-50' : 
+              uploadStatus === 'success' ? 'border-green-300 bg-green-50' : 
+              'border-gray-300 bg-gray-50'} 
+            hover:bg-gray-100 transition-colors
+          `}
+        >
+          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+            {uploadStatus === 'idle' && (
+              <>
+                <Upload className="w-10 h-10 mb-3 text-gray-400" />
+                <p className="mb-2 text-sm text-gray-500">
+                  <span className="font-semibold">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-gray-500">
+                  PDF, DOC, DOCX, TXT (MAX. 10MB)
+                </p>
+              </>
+            )}
+            
+            {uploadStatus === 'uploading' && (
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mb-3" />
+                <p className="text-sm text-gray-500">Uploading {fileName}...</p>
+              </div>
+            )}
+
+            {uploadStatus === 'success' && (
+              <>
+                <CheckCircle2 className="w-10 h-10 mb-3 text-green-500" />
+                <p className="text-sm text-green-600">File uploaded successfully!</p>
+                <p className="text-xs text-green-500">{fileName}</p>
+              </>
+            )}
+
+            {uploadStatus === 'error' && (
+              <>
+                <XCircle className="w-10 h-10 mb-3 text-red-500" />
+                <p className="text-sm text-red-600">Upload failed</p>
+                <p className="text-xs text-red-500">{fileName}</p>
+              </>
+            )}
+          </div>
+          <input 
+            id="file-upload" 
+            type="file" 
+            className="hidden" 
+            onChange={handleFileChange}
+            accept=".pdf,.doc,.docx,.txt"
+          />
+        </div>
       </div>
-      
-      {uploading && (
-        <div className="text-sm text-gray-600">Processing document...</div>
+
+      {uploadStatus === 'error' && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Upload Failed</AlertTitle>
+          <AlertDescription>
+            {errorMessage}
+          </AlertDescription>
+        </Alert>
       )}
-      
-      {error && (
-        <div className="text-sm text-red-600">{error}</div>
-      )}
-      
-      <div className="mt-2 text-xs text-gray-500">
-        Supported formats: .txt, .pdf
-      </div>
     </div>
   );
-}
+};
+
+export default FileUpload;
