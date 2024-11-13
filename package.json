@@ -12,12 +12,15 @@
     "react": "latest",
     "react-dom": "latest",
     "openai": "^4.0.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "formidable": "^3.5.1",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/formidable": "^3.4.5",
     "typescript": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",
