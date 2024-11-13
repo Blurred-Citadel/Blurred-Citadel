@@ -1,98 +1,124 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
-import { fetchKnowledgeItems, createKnowledgeItem, detectConnections, type KnowledgeItem } from '../lib/supabase';
+
+type KnowledgeItem = {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  connections: string[];
+  dateAdded: string;
+  lastUpdated: string;
+  files?: {
+    name: string;
+    url: string;
+    type: string;
+  }[];
+};
+
+// Sample data
+const sampleKnowledge: KnowledgeItem[] = [
+  {
+    id: '1',
+    title: 'AI Impact on Technical Recruitment',
+    content: 'Analysis of how AI is transforming technical recruitment processes and changing the way organizations identify and assess talent. Key areas include automated screening, predictive analytics for candidate success, and AI-driven interview processes.',
+    category: 'Technology',
+    tags: ['AI', 'recruitment', 'automation'],
+    connections: ['2', '4'],
+    dateAdded: '2024-03-20',
+    lastUpdated: '2024-03-20',
+    files: [
+      {
+        name: 'AI_Recruitment_Study.pdf',
+        url: '#',
+        type: 'pdf'
+      }
+    ]
+  },
+  {
+    id: '2',
+    title: 'Remote Work Trends 2024',
+    content: 'Comprehensive analysis of remote work adoption trends and their impact on workforce management. Includes data on productivity metrics, collaboration tools, and emerging challenges in virtual team management.',
+    category: 'Workforce Trends',
+    tags: ['remote work', 'workforce', 'trends'],
+    connections: ['1', '3'],
+    dateAdded: '2024-03-19',
+    lastUpdated: '2024-03-19'
+  }
+];
 
 export default function KnowledgeBase() {
-  const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<KnowledgeItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [knowledge, setKnowledge] = useState<KnowledgeItem[]>(sampleKnowledge);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Form state
   const [newItem, setNewItem] = useState({
     title: '',
     content: '',
     category: '',
-    tags: ['']
+    tags: '',
+    files: [] as File[]
   });
 
-  // Fetch items on component mount
-  useEffect(() => {
-    loadItems();
-  }, []);
+  const categories = ['all', ...Array.from(new Set(knowledge.map(item => item.category)))];
 
-  const loadItems = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchKnowledgeItems();
-      setItems(data);
-    } catch (err) {
-      setError('Failed to load knowledge base items');
-      console.error('Error loading items:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const categories = ['all', ...Array.from(new Set(items.map(item => item.category)))];
-
-  const filteredItems = items.filter(item => {
-    const matchesSearch = 
+  const filteredItems = knowledge.filter(item => {
+    const matchesSearch =
       item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+      item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    
     return matchesSearch && matchesCategory;
   });
 
-  const getConnectedItems = (itemId: string) => {
-    return items.filter(item => 
-      selectedItem?.connections?.includes(item.id)
-    );
-  };
-
-  const handleCreateItem = async () => {
-    try {
-      if (!newItem.title || !newItem.content || !newItem.category) {
-        setError('Please fill in all required fields');
-        return;
-      }
-
-      const createdItem = await createKnowledgeItem(newItem);
-      if (createdItem) {
-        await detectConnections(createdItem.id);
-        await loadItems();
-        setIsCreating(false);
-        setNewItem({ title: '', content: '', category: '', tags: [''] });
-      }
-    } catch (err) {
-      setError('Failed to create new item');
-      console.error('Error creating item:', err);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setNewItem(prev => ({
+        ...prev,
+        files: [...prev.files, ...filesArray]
+      }));
     }
   };
 
-  const handleAddTag = () => {
-    setNewItem(prev => ({
-      ...prev,
-      tags: [...prev.tags, '']
-    }));
-  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Create new knowledge item
+    const newKnowledgeItem: KnowledgeItem = {
+      id: (knowledge.length + 1).toString(),
+      title: newItem.title,
+      content: newItem.content,
+      category: newItem.category,
+      tags: newItem.tags.split(',').map(tag => tag.trim()),
+      connections: [],
+      dateAdded: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      files: newItem.files.map(file => ({
+        name: file.name,
+        url: URL.createObjectURL(file),
+        type: file.type
+      }))
+    };
 
-  const handleRemoveTag = (index: number) => {
-    setNewItem(prev => ({
-      ...prev,
-      tags: prev.tags.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleTagChange = (index: number, value: string) => {
-    setNewItem(prev => ({
-      ...prev,
-      tags: prev.tags.map((tag, i) => i === index ? value : tag)
-    }));
+    // Add to knowledge base
+    setKnowledge(prev => [...prev, newKnowledgeItem]);
+    
+    // Reset form
+    setNewItem({
+      title: '',
+      content: '',
+      category: '',
+      tags: '',
+      files: []
+    });
+    
+    setShowAddForm(false);
   };
 
   return (
@@ -118,7 +144,7 @@ export default function KnowledgeBase() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Search and Filter */}
+        {/* Controls */}
         <div className="mb-8 space-y-4">
           <div className="flex gap-4">
             <input
@@ -140,202 +166,194 @@ export default function KnowledgeBase() {
               ))}
             </select>
             <button
-              onClick={() => setIsCreating(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              onClick={() => setShowAddForm(true)}
             >
-              New Entry
+              Add New
             </button>
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded mb-4">
-            {error}
-            <button
-              onClick={() => setError(null)}
-              className="ml-2 text-sm underline"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Create New Item Modal */}
-        {isCreating && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
-              <h2 className="text-xl font-bold mb-4">Create New Knowledge Base Entry</h2>
-              <div className="space-y-4">
+        {/* Add Form Modal */}
+        {showAddForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+              <h2 className="text-xl font-bold mb-4">Add New Knowledge Item</h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Title</label>
                   <input
                     type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
                     value={newItem.title}
                     onChange={(e) => setNewItem(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full p-2 border rounded"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Content
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Content</label>
                   <textarea
+                    className="mt-1 block w-full border rounded-md p-2"
+                    rows={4}
                     value={newItem.content}
                     onChange={(e) => setNewItem(prev => ({ ...prev, content: e.target.value }))}
-                    className="w-full p-2 border rounded h-32"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Category</label>
                   <input
                     type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
                     value={newItem.category}
                     onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full p-2 border rounded"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tags
-                  </label>
-                  {newItem.tags.map((tag, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={tag}
-                        onChange={(e) => handleTagChange(index, e.target.value)}
-                        className="flex-1 p-2 border rounded"
-                      />
-                      <button
-                        onClick={() => handleRemoveTag(index)}
-                        className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={handleAddTag}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    + Add Tag
-                  </button>
+                  <label className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
+                    value={newItem.tags}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, tags: e.target.value }))}
+                    required
+                  />
                 </div>
-                <div className="flex justify-end gap-2 mt-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Files</label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    multiple
+                    accept=".pdf,.doc,.docx"
+                    className="mt-1 block w-full"
+                  />
+                  {newItem.files.length > 0 && (
+                    <div className="mt-2">
+                      <h4 className="text-sm font-medium text-gray-700">Selected files:</h4>
+                      <ul className="list-disc pl-5">
+                        {newItem.files.map((file, index) => (
+                          <li key={index} className="text-sm text-gray-600">{file.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-4">
                   <button
-                    onClick={() => setIsCreating(false)}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    type="button"
+                    className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                    onClick={() => setShowAddForm(false)}
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleCreateItem}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    Create Entry
+                    Add Item
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
         )}
 
         {/* Content Grid */}
-        {loading ? (
-          <div className="text-center py-10">Loading...</div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Knowledge Items List */}
-            <div className="lg:col-span-1 space-y-4">
-              {filteredItems.map(item => (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-lg border cursor-pointer transition-colors duration-200 ${
-                    selectedItem?.id === item.id
-                      ? 'bg-blue-50 border-blue-200'
-                      : 'bg-white hover:bg-gray-50 border-gray-200'
-                  }`}
-                  onClick={() => setSelectedItem(item)}
-                >
-                  <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {item.tags?.map((tag, index) => (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Knowledge Items List */}
+          <div className="lg:col-span-1 space-y-4">
+            {filteredItems.map(item => (
+              <div
+                key={item.id}
+                className={`p-4 rounded-lg border cursor-pointer transition-colors duration-200 ${
+                  selectedItem?.id === item.id
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-white hover:bg-gray-50 border-gray-200'
+                }`}
+                onClick={() => setSelectedItem(item)}
+              >
+                <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {item.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-500">
+                  Added: {new Date(item.dateAdded).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Selected Item Detail */}
+          <div className="lg:col-span-2">
+            {selectedItem ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-2xl font-bold mb-4">{selectedItem.title}</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    {selectedItem.category}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Last updated: {new Date(selectedItem.lastUpdated).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="prose max-w-none mb-6">
+                  <p>{selectedItem.content}</p>
+                </div>
+                {/* Attached Files */}
+                {selectedItem.files && selectedItem.files.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-2">Attached Files</h3>
+                    <div className="space-y-2">
+                      {selectedItem.files.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            {file.name}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Tags */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Tags</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItem.tags.map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
-                  <p className="text-sm text-gray-500">
-                    Added: {new Date(item.date_added).toLocaleDateString()}
-                  </p>
                 </div>
-              ))}
-            </div>
-
-            {/* Selected Item Detail */}
-            <div className="lg:col-span-2">
-              {selectedItem ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <h2 className="text-2xl font-bold mb-4">{selectedItem.title}</h2>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                      {selectedItem.category}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      Last updated: {new Date(selectedItem.last_updated).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="prose max-w-none mb-6">
-                    <p>{selectedItem.content}</p>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-2">Tags</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedItem.tags?.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Connected Items */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Connected Items</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {getConnectedItems(selectedItem.id).map(item => (
-                        <div
-                          key={item.id}
-                          className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
-                          onClick={() => setSelectedItem(item)}
-                        >
-                          <h4 className="font-medium mb-2">{item.title}</h4>
-                          <div className="text-sm text-gray-500">{item.category}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 text-center text-gray-500">
-                  Select an item to view details
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 text-center text-gray-500">
+                Select an item to view details
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
