@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { AlertCircle, Upload, CheckCircle2, XCircle } from 'lucide-react';
 
-// Remove the Alert import since we'll use a simpler error display
 const DocumentUpload = () => {
   const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
   const [errorMessage, setErrorMessage] = useState('');
   const [fileName, setFileName] = useState('');
 
-  const handleFileChange = async (event) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -32,7 +31,7 @@ const DocumentUpload = () => {
       setUploadStatus('success');
     } catch (error) {
       setUploadStatus('error');
-      setErrorMessage(error.message || 'Failed to upload file. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
     }
   };
 
