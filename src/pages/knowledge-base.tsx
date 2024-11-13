@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import FileUpload from '@/components/FileUpload';
+import DocumentUpload from '@/components/knowledge/DocumentUpload';
 
 type KnowledgeItem = {
   id: string;
@@ -107,7 +107,7 @@ export default function KnowledgeBase() {
         {/* File Upload Section */}
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4">Upload Knowledge Base Document</h2>
-          <FileUpload />
+          <DocumentUpload />
         </div>
 
         {/* Search and Filter */}
