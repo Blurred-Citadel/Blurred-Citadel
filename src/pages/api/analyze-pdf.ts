@@ -20,6 +20,13 @@ type AnalysisResult = {
   }[];
 }
 
+type ExistingDocument = {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -29,7 +36,10 @@ export default async function handler(
   }
 
   try {
-    const { fileContent, existingDocuments } = req.body;
+    const { fileContent, existingDocuments }: { 
+      fileContent: string, 
+      existingDocuments: ExistingDocument[] 
+    } = req.body;
 
     // Analyze the PDF content using GPT-4
     const analysisPrompt = `
@@ -83,7 +93,9 @@ export default async function handler(
       Format the response as JSON array: [{"documentId": "string", "strength": number}]
       
       Existing documents:
-      ${existingDocuments.map(doc => `ID: ${doc.id}\nTitle: ${doc.title}\nContent: ${doc.content}`).join('\n\n')}`;
+      ${existingDocuments.map((doc: ExistingDocument) => 
+        `ID: ${doc.id}\nTitle: ${doc.title}\nContent: ${doc.content}`
+      ).join('\n\n')}`;
 
       const connectionsResponse = await openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
