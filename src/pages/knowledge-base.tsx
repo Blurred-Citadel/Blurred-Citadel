@@ -22,6 +22,20 @@ type KnowledgeItem = {
   thoughtLeadership?: string[];
 };
 
+type NewItemFormData = {
+  title: string;
+  content: string;
+  category: string;
+  tags: string;
+  files: File[];
+  connections?: {
+    documentId: string;
+    strength: number;
+  }[];
+  keyStats?: string[];
+  thoughtLeadership?: string[];
+};
+
 // Sample data structure updated with new fields
 const sampleKnowledge: KnowledgeItem[] = [
   {
@@ -67,13 +81,13 @@ export default function KnowledgeBase() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [newItem, setNewItem] = useState({
+  // Form state with proper typing
+  const [newItem, setNewItem] = useState<NewItemFormData>({
     title: '',
     content: '',
     category: '',
     tags: '',
-    files: [] as File[]
+    files: []
   });
 
   const categories = ['all', ...Array.from(new Set(knowledge.map(item => item.category)))];
@@ -118,16 +132,11 @@ export default function KnowledgeBase() {
             content: analysis.content,
             category: analysis.category,
             tags: analysis.tags.join(', '),
-            files: [file]
-          });
-
-          // Store the additional analysis data to be saved with the item
-          setNewItem(prev => ({
-            ...prev,
+            files: [file],
             keyStats: analysis.keyStats,
             thoughtLeadership: analysis.thoughtLeadership,
             connections: analysis.connections
-          }));
+          });
 
         } catch (error) {
           console.error('Error analyzing PDF:', error);
@@ -190,15 +199,60 @@ export default function KnowledgeBase() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header and Navigation components remain the same */}
-      
+      {/* Header */}
+      <header className="bg-black text-white">
+        <div className="container mx-auto px-4">
+          <h1 className="text-2xl font-bold py-4">Blurred Citadel</h1>
+        </div>
+      </header>
+
+      {/* Navigation Bar */}
+      <nav className="bg-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="flex space-x-4 py-3">
+            <Link href="/" className="text-gray-300 hover:text-white">News</Link>
+            <Link href="/knowledge-base" className="text-white">Knowledge Base</Link>
+            <Link href="#" className="text-gray-300 hover:text-white">Reports</Link>
+            <Link href="#" className="text-gray-300 hover:text-white">Analytics</Link>
+          </div>
+        </div>
+      </nav>
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Controls remain the same */}
+        {/* Controls */}
+        <div className="mb-8 space-y-4">
+          <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="Search knowledge base..."
+              className="flex-1 p-2 border rounded"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <select
+              className="p-2 border rounded"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </option>
+              ))}
+            </select>
+            <button
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              onClick={() => setShowAddForm(true)}
+            >
+              Add New
+            </button>
+          </div>
+        </div>
 
         {/* Add Form Modal */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
               <h2 className="text-xl font-bold mb-4">Add New Knowledge Item</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -218,9 +272,46 @@ export default function KnowledgeBase() {
                     </div>
                   )}
                 </div>
-
-                {/* Rest of the form fields remain the same */}
-                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Title</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
+                    value={newItem.title}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, title: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Content</label>
+                  <textarea
+                    className="mt-1 block w-full border rounded-md p-2"
+                    rows={4}
+                    value={newItem.content}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, content: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Category</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
+                    value={newItem.category}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full border rounded-md p-2"
+                    value={newItem.tags}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, tags: e.target.value }))}
+                    required
+                  />
+                </div>
                 <div className="flex justify-end gap-4">
                   <button
                     type="button"
@@ -244,16 +335,53 @@ export default function KnowledgeBase() {
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Knowledge Items List remains mostly the same */}
+          {/* Knowledge Items List */}
+          <div className="lg:col-span-1 space-y-4">
+            {filteredItems.map(item => (
+              <div
+                key={item.id}
+                className={`p-4 rounded-lg border cursor-pointer transition-colors duration-200 ${
+                  selectedItem?.id === item.id
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-white hover:bg-gray-50 border-gray-200'
+                }`}
+                onClick={() => setSelectedItem(item)}
+              >
+                <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {item.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-500">
+                  Added: {new Date(item.dateAdded).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
 
           {/* Selected Item Detail */}
           <div className="lg:col-span-2">
             {selectedItem ? (
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h2 className="text-2xl font-bold mb-4">{selectedItem.title}</h2>
-                
-                {/* Basic info remains the same */}
-                
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    {selectedItem.category}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Last updated: {new Date(selectedItem.lastUpdated).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="prose max-w-none mb-6">
+                  <p>{selectedItem.content}</p>
+                </div>
+
                 {/* Key Statistics Section */}
                 {selectedItem.keyStats && selectedItem.keyStats.length > 0 && (
                   <div className="mb-6">
@@ -274,13 +402,37 @@ export default function KnowledgeBase() {
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-3">Thought Leadership</h3>
                     <ul className="space-y-2">
-                      {selectedItem.thoughtLeadership.map((point, index) => (
+                      {selectedItem.thoughtLeadership.map((point{selectedItem.thoughtLeadership.map((point, index) => (
                         <li key={index} className="flex items-start">
                           <span className="flex-shrink-0 w-1.5 h-1.5 mt-2 bg-purple-600 rounded-full mr-2"></span>
                           <span className="text-gray-700">{point}</span>
                         </li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {/* Attached Files */}
+                {selectedItem.files && selectedItem.files.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-2">Attached Files</h3>
+                    <div className="space-y-2">
+                      {selectedItem.files.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            {file.name}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -312,7 +464,20 @@ export default function KnowledgeBase() {
                   </div>
                 </div>
 
-                {/* Tags section remains the same */}
+                {/* Tags */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Tags</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItem.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 text-center text-gray-500">
@@ -325,4 +490,3 @@ export default function KnowledgeBase() {
     </div>
   );
 }
-                            
