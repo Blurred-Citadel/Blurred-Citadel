@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { IncomingForm } from 'formidable';
+import formidable from 'formidable';
+import { supabase } from '@/lib/supabase';
 
 export const config = {
   api: {
@@ -16,7 +17,7 @@ export default async function handler(
   }
 
   try {
-    const form = new IncomingForm({
+    const form = formidable({
       maxFileSize: 10 * 1024 * 1024, // 10MB
       allowEmptyFiles: false,
     });
@@ -33,12 +34,25 @@ export default async function handler(
         return res.status(400).json({ message: 'No file provided' });
       }
 
-      // Here you would typically process the file
-      // For now, we'll just return success
-      res.status(200).json({ 
-        message: 'File uploaded successfully',
-        filename: file.originalFilename 
-      });
+      try {
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('knowledge-base')
+          .upload(`documents/${Date.now()}-${file.originalFilename}`, file);
+
+        if (error) {
+          throw error;
+        }
+
+        res.status(200).json({ 
+          message: 'File uploaded successfully',
+          filename: file.originalFilename,
+          path: data.path
+        });
+      } catch (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        res.status(500).json({ message: 'Error uploading to storage' });
+      }
     });
   } catch (error) {
     console.error('Server error:', error);
