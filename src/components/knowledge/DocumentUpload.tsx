@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { AlertCircle, Upload, CheckCircle2, XCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const FileUpload = () => {
+// Remove the Alert import since we'll use a simpler error display
+const DocumentUpload = () => {
   const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
   const [errorMessage, setErrorMessage] = useState('');
   const [fileName, setFileName] = useState('');
@@ -93,20 +93,17 @@ const FileUpload = () => {
             onChange={handleFileChange}
             accept=".pdf,.doc,.docx,.txt"
           />
-        </div>
+        </label>
       </div>
 
       {uploadStatus === 'error' && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Upload Failed</AlertTitle>
-          <AlertDescription>
-            {errorMessage}
-          </AlertDescription>
-        </Alert>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Upload Failed! </strong>
+          <span className="block sm:inline">{errorMessage}</span>
+        </div>
       )}
     </div>
   );
 };
 
-export default FileUpload;
+export default DocumentUpload;
