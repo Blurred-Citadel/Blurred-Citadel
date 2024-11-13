@@ -195,9 +195,7 @@ export default function KnowledgeBase() {
       }))
       .filter(conn => conn.item)
       .sort((a, b) => b.strength - a.strength);
-  };
-
-  return (
+  };return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-black text-white">
@@ -399,10 +397,12 @@ export default function KnowledgeBase() {
 
                 {/* Thought Leadership Section */}
                 {selectedItem.thoughtLeadership && selectedItem.thoughtLeadership.length > 0 && (
+                  <div className="mb-{/* Thought Leadership Section */}
+                {selectedItem.thoughtLeadership && selectedItem.thoughtLeadership.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-3">Thought Leadership</h3>
                     <ul className="space-y-2">
-                      {selectedItem.thoughtLeadership.map((point{selectedItem.thoughtLeadership.map((point, index) => (
+                      {selectedItem.thoughtLeadership.map((point, index) => (
                         <li key={index} className="flex items-start">
                           <span className="flex-shrink-0 w-1.5 h-1.5 mt-2 bg-purple-600 rounded-full mr-2"></span>
                           <span className="text-gray-700">{point}</span>
