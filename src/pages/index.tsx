@@ -1,336 +1,320 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
-type NewsItem = {
-  title: string;
-  description: string;
-  url: string;
-  source: string;
-  publishedAt: string;
-  impact: string;
-  sector: string;
-  analysis?: {
-    keyInsights: string[];
-    implications: {
-      shortTerm: string;
-      longTerm: string;
-    };
-    relevanceScore: number;
-    workforceTrends: string[];
-  };
-}
+type RunEntry = {
+  id: string;
+  athleteId: string;
+  name: string;
+  date: string;
+  distanceMiles: number;
+  durationMinutes: number;
+  pace: string;
+};
 
-const CATEGORIES = [
-  { id: 'ai', name: 'AI & Automation' },
-  { id: 'labor', name: 'Labour Market' },
-  { id: 'msp', name: 'MSP/RPO' },
-  { id: 'stem', name: 'STEM' },
-  { id: 'chomsky', name: 'Critical Analysis' },
-  { id: 'all', name: 'All Categories' }
-];
+type Athlete = {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  januaryMiles: number;
+  totalMiles: number;
+  longestRunMiles: number;
+  weeklyAverageMiles: number;
+  lastActivity: string;
+  runs: RunEntry[];
+};
 
-const REGIONS = [
-  { id: 'uk', name: 'United Kingdom' },
-  { id: 'usa', name: 'United States' },
-  { id: 'eu', name: 'Europe' },
-  { id: 'global', name: 'Global' }
-];
+type HeadToHeadResponse = {
+  goalMiles: number;
+  lastUpdated: string;
+  athletes: Athlete[];
+};
+
+const numberFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1
+});
+
+const formatMiles = (value: number) => `${numberFormatter.format(value)} mi`;
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+const getLeader = (athletes: Athlete[], metric: keyof Athlete) => {
+  if (athletes.length === 0) return null;
+  return athletes.reduce((leader, current) =>
+    current[metric] > leader[metric] ? current : leader
+  );
+};
 
 export default function Home() {
-  const [news, setNews] = useState<NewsItem[]>([]);
+  const [dashboard, setDashboard] = useState<HeadToHeadResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedCard, setExpandedCard] = useState<number | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedRegion, setSelectedRegion] = useState('global');
 
   useEffect(() => {
-    fetchNews();
-  }, [selectedCategory, selectedRegion]);
+    let timeoutId: ReturnType<typeof setInterval>;
 
-  const fetchNews = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/news?category=${selectedCategory}&region=${selectedRegion}`);
-      const data = await response.json();
-      setNews(data);
-    } catch (err) {
-      setError('Failed to fetch news');
-      console.error('Error fetching news:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/strava-head-to-head');
+        if (!response.ok) {
+          throw new Error('Unable to load dashboard');
+        }
+        const data = (await response.json()) as HeadToHeadResponse;
+        setDashboard(data);
+        setError(null);
+      } catch (err) {
+        console.error(err);
+        setError('Live feed unavailable. Please refresh.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const toggleCard = (index: number) => {
-    setExpandedCard(expandedCard === index ? null : index);
-  };
+    fetchDashboard();
+    timeoutId = setInterval(fetchDashboard, 60000);
 
-  const FilterButton = ({
-    active,
-    onClick,
-    children
-  }: {
-    active: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-  }) => (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200
-        ${active
-          ? 'bg-gray-900 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-    >
-      {children}
-    </button>
-  );
+    return () => clearInterval(timeoutId);
+  }, []);
 
-  const MainContent = () => (
-    <div className="container mx-auto px-4 py-6">
-      <div className="mb-8 space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">Category Focus</h2>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(category => (
-              <FilterButton
-                key={category.id}
-                active={selectedCategory === category.id}
-                onClick={() => setSelectedCategory(category.id)}
-              >
-                {category.name}
-              </FilterButton>
-            ))}
-          </div>
-        </div>
+  const goalMiles = dashboard?.goalMiles ?? 100;
 
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">Geographic Region</h2>
-          <div className="flex flex-wrap gap-2">
-            {REGIONS.map(region => (
-              <FilterButton
-                key={region.id}
-                active={selectedRegion === region.id}
-                onClick={() => setSelectedRegion(region.id)}
-              >
-                {region.name}
-              </FilterButton>
-            ))}
-          </div>
-        </div>
+  const combinedRuns = useMemo(() => {
+    if (!dashboard) return [] as RunEntry[];
+    return dashboard.athletes
+      .flatMap((athlete) => athlete.runs)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [dashboard]);
 
-        <div className="pt-2">
-          <div className="text-sm text-gray-500">
-            Showing: {' '}
-            <span className="font-medium text-gray-900">
-              {CATEGORIES.find(c => c.id === selectedCategory)?.name} •
-              {REGIONS.find(r => r.id === selectedRegion)?.name}
-            </span>
-            {selectedCategory !== 'all' && (
-              <button
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setSelectedRegion('global');
-                }}
-                className="ml-2 text-gray-400 hover:text-gray-600"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+  const januaryLeader = dashboard
+    ? getLeader(dashboard.athletes, 'januaryMiles')
+    : null;
+  const totalLeader = dashboard ? getLeader(dashboard.athletes, 'totalMiles') : null;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {news.map((item, index) => (
-          <div key={index}>
-            <div
-              className="bg-gray-50 shadow rounded-lg transition-all duration-300 h-[400px] cursor-pointer hover:shadow-lg border border-gray-200"
-              onClick={() => toggleCard(index)}
-            >
-              <div className="p-4 h-full flex flex-col">
-                <div className="flex-none">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {item.title}
-                  </h2>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 mb-2"
-                  >
-                    Read original article
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium
-                      ${item.impact.toLowerCase() === 'high' ? 'bg-red-100 text-red-800' :
-                        item.impact.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-blue-100 text-blue-800'}`}
-                    >
-                      {item.impact}
-                    </span>
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
-                      {item.sector}
-                    </span>
-                  </div>
-                </div>
+  const goalProgress = (miles: number) =>
+    Math.min(100, Math.round((miles / goalMiles) * 100));
 
-                <div className="flex-grow overflow-hidden">
-                  <p className="text-sm text-gray-600 line-clamp-3">{item.description}</p>
-                  {item.analysis && (
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-500">Click to view full analysis</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 pt-4 border-t text-xs text-gray-500">
-                  {item.source} • {new Date(item.publishedAt).toLocaleDateString()}
-                </div>
-              </div>
-            </div>
-
-            {expandedCard === index && (
-              <>
-                <div
-                  className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                  onClick={() => toggleCard(index)}
-                />
-                <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
-                  bg-gray-50 rounded-lg shadow-xl z-50 w-[90%] max-w-6xl max-h-[80vh]
-                  overflow-y-auto border border-gray-200">
-                  <div className="p-6">
-                    <button
-                      onClick={() => toggleCard(index)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-
-                    <div className="grid grid-cols-3 gap-6">
-                      <div className="col-span-1">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">{item.title}</h2>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          <span className={`px-2 py-1 rounded-full text-sm font-medium
-                            ${item.impact.toLowerCase() === 'high' ? 'bg-red-100 text-red-800' :
-                              item.impact.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-blue-100 text-blue-800'}`}
-                          >
-                            {item.impact}
-                          </span>
-                          <span className="px-2 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
-                            {item.sector}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 mb-4">{item.description}</p>
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
-                        >
-                          Read full article
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                        <div className="mt-4 text-sm text-gray-500">
-                          {item.source} • {new Date(item.publishedAt).toLocaleDateString()}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2">
-                        {item.analysis && (
-                          <div className="space-y-6">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-3">Key Insights</h3>
-                              <ul className="space-y-2">
-                                {item.analysis.keyInsights.map((insight, i) => (
-                                  <li key={i} className="flex items-start">
-                                    <span className="flex-shrink-0 w-1.5 h-1.5 mt-2 bg-blue-600 rounded-full mr-2"></span>
-                                    <span className="text-gray-600">{insight}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-3">Implications</h3>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white p-4 rounded shadow-sm">
-                                  <h4 className="font-medium text-gray-900 mb-2">Short Term</h4>
-                                  <p className="text-gray-600">{item.analysis.implications.shortTerm}</p>
-                                </div>
-                                <div className="bg-white p-4 rounded shadow-sm">
-                                  <h4 className="font-medium text-gray-900 mb-2">Long Term</h4>
-                                  <p className="text-gray-600">{item.analysis.implications.longTerm}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-3">Workforce Trends</h3>
-                              <div className="flex flex-wrap gap-2">
-                                {item.analysis.workforceTrends.map((trend, i) => (
-                                  <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
-                                    {trend}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const content = loading ? (
-    <div className="text-center py-10">Loading...</div>
-  ) : error ? (
-    <div className="bg-red-50 text-red-600 p-4 rounded">{error}</div>
-  ) : (
-    <MainContent />
-  );
+  const milesToGoal = (miles: number) => Math.max(0, goalMiles - miles);
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-black text-white">
-        <div className="container mx-auto px-4">
-          <h1 className="text-2xl font-bold py-4">Blurred Citadel</h1>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <header className="bg-slate-900 border-b border-slate-800">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-bold">January Strava Showdown</h1>
+            <p className="text-slate-300 max-w-2xl">
+              Head-to-head live dashboard tracking the 100-mile January goal and total
+              distance leaderboard.
+            </p>
+          </div>
         </div>
       </header>
 
-      {/* Navigation Bar */}
-      <nav className="bg-gray-800">
+      <nav className="bg-slate-900/70 border-b border-slate-800">
         <div className="container mx-auto px-4">
-          <div className="flex space-x-4 py-3">
-            <Link href="/" className="text-white">News</Link>
-            <Link href="/knowledge-base" className="text-gray-300 hover:text-white">Knowledge Base</Link>
-            <Link href="#" className="text-gray-300 hover:text-white">Reports</Link>
-            <Link href="#" className="text-gray-300 hover:text-white">Analytics</Link>
+          <div className="flex gap-6 py-4 text-sm">
+            <Link href="/" className="text-white">
+              Live Dashboard
+            </Link>
+            <Link href="/knowledge-base" className="text-slate-400 hover:text-white">
+              Knowledge Base
+            </Link>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
-      {content}
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {loading ? (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center">
+            Loading live data...
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
+            {error}
+          </div>
+        ) : (
+          <>
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm uppercase tracking-wide text-slate-400">
+                        January 100-mile goal
+                      </p>
+                      <h2 className="text-2xl font-semibold">Race to 100 miles</h2>
+                    </div>
+                    <div className="text-right text-sm text-slate-400">
+                      Last updated {dashboard ? formatDateTime(dashboard.lastUpdated) : ''}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {dashboard?.athletes.map((athlete) => (
+                      <div key={athlete.id} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={athlete.avatarUrl}
+                              alt={athlete.name}
+                              className="h-12 w-12 rounded-full border border-slate-700"
+                            />
+                            <div>
+                              <p className="font-semibold">{athlete.name}</p>
+                              <p className="text-sm text-slate-400">
+                                {formatMiles(athlete.januaryMiles)} so far
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-lg font-semibold">
+                            {goalProgress(athlete.januaryMiles)}%
+                          </p>
+                        </div>
+                        <div className="h-3 w-full rounded-full bg-slate-800">
+                          <div
+                            className="h-3 rounded-full bg-gradient-to-r from-orange-400 to-pink-500"
+                            style={{ width: `${goalProgress(athlete.januaryMiles)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Goal: {formatMiles(goalMiles)}</span>
+                          <span>
+                            {formatMiles(milesToGoal(athlete.januaryMiles))} to go
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm uppercase tracking-wide text-slate-400">
+                        Total distance leaderboard
+                      </p>
+                      <h2 className="text-2xl font-semibold">Who goes the farthest?</h2>
+                    </div>
+                    <div className="text-sm text-slate-400">All-time to date</div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {dashboard?.athletes.map((athlete) => (
+                      <div
+                        key={athlete.id}
+                        className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/40 p-4"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold">{athlete.name}</p>
+                            <p className="text-sm text-slate-400">Total mileage</p>
+                          </div>
+                          <p className="text-xl font-semibold">
+                            {formatMiles(athlete.totalMiles)}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm text-slate-300">
+                          <div>
+                            <p className="text-xs uppercase text-slate-500">Longest run</p>
+                            <p className="font-semibold">
+                              {formatMiles(athlete.longestRunMiles)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase text-slate-500">Weekly avg</p>
+                            <p className="font-semibold">
+                              {formatMiles(athlete.weeklyAverageMiles)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase text-slate-500">Last activity</p>
+                            <p className="font-semibold">{formatDate(athlete.lastActivity)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/80 to-slate-950 p-6">
+                  <h3 className="text-lg font-semibold mb-4">Current Leaders</h3>
+                  <div className="space-y-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">January miles</span>
+                      <span className="font-semibold">
+                        {januaryLeader?.name ?? '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Total distance</span>
+                      <span className="font-semibold">
+                        {totalLeader?.name ?? '—'}
+                      </span>
+                    </div>
+                    <div className="border-t border-slate-800 pt-4">
+                      <p className="text-slate-400">Goal status</p>
+                      <p className="text-2xl font-semibold">
+                        {dashboard?.athletes.every((athlete) => athlete.januaryMiles >= goalMiles)
+                          ? 'Both hit 100+'
+                          : 'Keep pushing'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <h3 className="text-lg font-semibold mb-4">Recent runs</h3>
+                  <div className="space-y-4 text-sm">
+                    {combinedRuns.slice(0, 6).map((run) => {
+                      const athlete = dashboard?.athletes.find(
+                        (person) => person.id === run.athleteId
+                      );
+                      return (
+                        <div key={run.id} className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold">
+                              {athlete?.name ?? 'Runner'} • {run.name}
+                            </p>
+                            <p className="text-slate-400">
+                              {formatDate(run.date)} • {run.pace} pace
+                            </p>
+                          </div>
+                          <p className="font-semibold">{formatMiles(run.distanceMiles)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <h3 className="text-lg font-semibold mb-2">Live feed</h3>
+                  <p className="text-sm text-slate-400">
+                    Auto-refreshes every 60 seconds. Swap in your Strava API tokens in
+                    <code className="mx-1 rounded bg-slate-800 px-2 py-0.5 text-xs">
+                      /api/strava-head-to-head
+                    </code>
+                    to pull real activities.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+      </main>
     </div>
   );
 }
