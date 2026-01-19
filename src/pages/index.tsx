@@ -303,7 +303,15 @@ export default function Home() {
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
                   <h3 className="text-lg font-semibold mb-2">Live feed</h3>
                   <p className="text-sm text-slate-400">
-                    Auto-refreshes every 60 seconds. Swap in your Strava API tokens in
+                    Auto-refreshes every 60 seconds. Add
+                    <code className="mx-1 rounded bg-slate-800 px-2 py-0.5 text-xs">
+                      STRAVA_ATHLETE_ONE_TOKEN
+                    </code>
+                    and
+                    <code className="mx-1 rounded bg-slate-800 px-2 py-0.5 text-xs">
+                      STRAVA_ATHLETE_TWO_TOKEN
+                    </code>
+                    in
                     <code className="mx-1 rounded bg-slate-800 px-2 py-0.5 text-xs">
                       /api/strava-head-to-head
                     </code>
